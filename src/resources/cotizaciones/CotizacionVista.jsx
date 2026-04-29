@@ -960,9 +960,6 @@ const CotizacionVista = () => {
                       <tr>
                         <th style={estilos.th}>Tipo vidrio</th>
                         <th style={estilos.th}>Cantidad</th>
-                        <th style={estilos.th}>Ancho</th>
-                        <th style={estilos.th}>Alto</th>
-                        <th style={estilos.th}>Instalación</th>
                         <th style={estilos.th}>Precio Unitario</th>
                         <th style={estilos.th}>Subtotal</th>
                         <th style={estilos.th}>Descripción</th>
@@ -970,16 +967,13 @@ const CotizacionVista = () => {
                     </thead>
                     <tbody>
                       {adicionalesVidrio.map((item, index) => (
-                        <tr key={item.idVidrio || index}>
-                          <td style={estilos.td}>{item.tipoVidrio || "-"}</td>
-                          <td style={estilos.td}>{item.cantidad ?? "-"}</td>
-                          <td style={estilos.td}>{formatearNumero(item.ancho)}</td>
-                          <td style={estilos.td}>{formatearNumero(item.alto)}</td>
-                          <td style={estilos.td}>{item.instalacion ? "Sí" : "No"}</td>
-                          <td style={estilos.td}>{formatearMoneda(item.precioUnitario)}</td>
-                          <td style={estilos.td}>{formatearMoneda(item.subtotal)}</td>
-                          <td style={estilos.td}>{item.descripcion || "-"}</td>
-                        </tr>
+                    <tr key={item.idVidrio || index}>
+                      <td style={estilos.td}>{item.tipoVidrio || "-"}</td>
+                      <td style={estilos.td}>{item.cantidad ?? "-"}</td>
+                      <td style={estilos.td}>{formatearMoneda(item.precioUnitario)}</td>
+                      <td style={estilos.td}>{formatearMoneda(item.subtotal)}</td>
+                      <td style={estilos.td}>{item.descripcion || "-"}</td>
+                    </tr>
                       ))}
                     </tbody>
                   </table>
@@ -998,9 +992,6 @@ const CotizacionVista = () => {
                       <tr>
                         <th style={estilos.th}>Tipo granito</th>
                         <th style={estilos.th}>Cantidad</th>
-                        <th style={estilos.th}>Largo</th>
-                        <th style={estilos.th}>Ancho</th>
-                        <th style={estilos.th}>Espesor</th>
                         <th style={estilos.th}>Precio Unitario</th>
                         <th style={estilos.th}>Subtotal</th>
                         <th style={estilos.th}>Descripción</th>
@@ -1008,16 +999,13 @@ const CotizacionVista = () => {
                     </thead>
                     <tbody>
                       {adicionalesMeson.map((item, index) => (
-                        <tr key={item.idMeson || index}>
-                          <td style={estilos.td}>{item.tipoGranito || "-"}</td>
-                          <td style={estilos.td}>{item.cantidad ?? "-"}</td>
-                          <td style={estilos.td}>{formatearNumero(item.largo)}</td>
-                          <td style={estilos.td}>{formatearNumero(item.ancho)}</td>
-                          <td style={estilos.td}>{formatearNumero(item.espesor)}</td>
-                          <td style={estilos.td}>{formatearMoneda(item.precioUnitario)}</td>
-                          <td style={estilos.td}>{formatearMoneda(item.subtotal)}</td>
-                          <td style={estilos.td}>{item.descripcion || "-"}</td>
-                        </tr>
+                    <tr key={item.idMeson || index}>
+                      <td style={estilos.td}>{item.tipoGranito || "-"}</td>
+                      <td style={estilos.td}>{item.cantidad ?? "-"}</td>
+                      <td style={estilos.td}>{formatearMoneda(item.precioUnitario)}</td>
+                      <td style={estilos.td}>{formatearMoneda(item.subtotal)}</td>
+                      <td style={estilos.td}>{item.descripcion || "-"}</td>
+                    </tr>
                       ))}
                     </tbody>
                   </table>

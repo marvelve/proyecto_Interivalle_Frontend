@@ -17,6 +17,7 @@ const crearActividadVacia = () => ({
   medida: "",
   tipoCobro: "",
   precioUnitario: "",
+  precioEditable: false,
   descripcion: "",
   subtotal: 0,
 });
@@ -50,15 +51,24 @@ const FormObraBlanca = ({
 
     return actividadesCatalogo
       .filter((act) => act?.estado !== false)
-      .map((act) => ({
-        idActividad: act.idActividad ?? act.id ?? "",
-        nombreActividad: act.nombreActividad ?? act.nombre ?? "",
-        tipoCobro: act.tipoCobro ?? act.tipo_cobro ?? act.unidadCobro ?? "",
-        precioUnitario:
-          act.precioUnitario ?? act.precio ?? act.valorUnitario ?? "",
-        descripcion:
-          act.descripcion ?? act.nombreActividad ?? act.nombre ?? "",
-      }));
+      .map((act) => {
+        const precioUnitario =
+          act.precioUnitario ?? act.precio ?? act.valorUnitario ?? "";
+
+        return {
+          idActividad: act.idActividad ?? act.id ?? "",
+          nombreActividad: act.nombreActividad ?? act.nombre ?? "",
+          tipoCobro: act.tipoCobro ?? act.tipo_cobro ?? act.unidadCobro ?? "",
+          precioUnitario,
+          precioEditable:
+            act.precioEditable === true ||
+            precioUnitario === "" ||
+            precioUnitario === null ||
+            precioUnitario === undefined,
+          descripcion:
+            act.descripcion ?? act.nombreActividad ?? act.nombre ?? "",
+        };
+      });
   }, [actividadesCatalogo]);
 
   const marcarTouched = (index, campo) => {
@@ -215,6 +225,7 @@ const FormObraBlanca = ({
         descripcion: "",
         cantidad: "",
         medida: "",
+        precioEditable: false,
       });
       actualizarActividades(nuevas);
       return;
@@ -227,6 +238,7 @@ const FormObraBlanca = ({
       idActividad: actividadSeleccionada.idActividad,
       tipoCobro,
       precioUnitario: actividadSeleccionada.precioUnitario || "",
+      precioEditable: actividadSeleccionada.precioEditable,
       descripcion: actividadSeleccionada.descripcion || "",
       cantidad: esTipoMetro(tipoCobro) ? "" : nuevas[index].cantidad,
       medida: esTipoUnidad(tipoCobro) ? "" : nuevas[index].medida,
@@ -392,9 +404,14 @@ const FormObraBlanca = ({
                 <TextField
                   fullWidth
                   label="Precio unitario"
+                  type="number"
                   value={item.precioUnitario ?? ""}
+                  onChange={(e) =>
+                    handleChange(index, "precioUnitario", e.target.value)
+                  }
                   disabled={filaDeshabilitada}
-                  InputProps={{ readOnly: true }}
+                  InputProps={{ readOnly: !item.precioEditable }}
+                  inputProps={{ min: 0 }}
                   InputLabelProps={{ shrink: true }}
                 />
               </Grid>
