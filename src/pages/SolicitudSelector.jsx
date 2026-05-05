@@ -254,9 +254,9 @@ const SolicitudSelector = () => {
                       borderRadius: 4,
                       fontSize: "1.1rem",
                       fontWeight: "bold",
-                      backgroundColor: "#0aa000",
+                      backgroundColor: "#2e7d32",
                       "&:hover": {
-                        backgroundColor: "#0aa000",
+                        backgroundColor: "#1b5e20",
                       },
                     }}
                   >

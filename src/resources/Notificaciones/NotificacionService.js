@@ -16,11 +16,21 @@ const NotificacionService = {
     return json;
   },
 
-  marcarComoLeida: async (idNotificacion) => {
-    const { json } = await httpClient(`${apiUrl}/api/notificaciones/${idNotificacion}/leer`, {
-      method: "PUT",
-    });
+  obtenerAvance: async (idAvance) => {
+    const { json } = await httpClient(`${apiUrl}/api/avances/${idAvance}`);
     return json;
+  },
+
+  marcarComoLeida: async (idNotificacion) => {
+    try {
+      const { json } = await httpClient(`${apiUrl}/api/notificaciones/${idNotificacion}/leer`, {
+        method: "PUT",
+      });
+      return json;
+    } catch (error) {
+      console.error("No se pudo marcar la notificacion como leida", error);
+      return null;
+    }
   },
 
   marcarTodasComoLeidas: async () => {

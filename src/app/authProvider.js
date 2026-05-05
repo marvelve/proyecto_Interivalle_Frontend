@@ -32,9 +32,15 @@ const authProvider = {
       localStorage.setItem("token", data.token);
       localStorage.setItem("tipo", data.tipo || "Bearer");
       localStorage.setItem("correoUsuario", data.correoUsuario || "");
-      localStorage.setItem("idRol", String(data.idRol ?? ""));
+      const idRol = String(data.idRol ?? "");
+      localStorage.setItem("idRol", idRol);
 
-      return Promise.resolve();
+      return Promise.resolve({
+        redirectTo:
+          idRol === "1" || idRol === "2"
+            ? "/cotizaciones"
+            : "/solicitudes/create",
+      });
     } catch (error) {
       return Promise.reject(error.message || "Error al iniciar sesión");
     }

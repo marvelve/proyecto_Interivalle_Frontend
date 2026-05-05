@@ -16,7 +16,15 @@ import {
 } from "@mui/material";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import { useNavigate } from "react-router-dom";
+import { Title } from "react-admin";
 import { apiUrl } from "../../app/httpClient";
+import {
+  centeredPageSx,
+  compactTableContainerSx,
+  compactTableSx,
+  tableHeaderGreen,
+} from "../../app/listStyles";
+import { ClienteProyectoCards } from "../../components/ClienteProyectoCards";
 
 const SeguimientoObraList = () => {
   const navigate = useNavigate();
@@ -95,7 +103,14 @@ const SeguimientoObraList = () => {
         })
       );
 
-      setRegistros(resultados.filter(Boolean));
+      setRegistros(
+        resultados
+          .filter(Boolean)
+          .sort(
+            (a, b) =>
+              Number(b.idCronograma || 0) - Number(a.idCronograma || 0)
+          )
+      );
     } catch (error) {
       console.error("Error cargando seguimiento de obra:", error);
       alert(error.message || "No se pudo cargar el seguimiento de obra");
@@ -106,10 +121,8 @@ const SeguimientoObraList = () => {
   };
 
   return (
-    <Box p={3}>
-      <Typography variant="h4" fontWeight="bold" mb={3}>
-        Seguimiento de Obra
-      </Typography>
+    <Box p={3} sx={centeredPageSx}>
+      <Title title="Seguimiento de Obra" />
 
       <Card sx={{ borderRadius: 3, boxShadow: 3 }}>
         <CardContent>
@@ -122,11 +135,25 @@ const SeguimientoObraList = () => {
             <Typography>
               No hay cotizaciones con seguimiento registrado.
             </Typography>
+          ) : esCliente ? (
+            <ClienteProyectoCards
+              records={registros}
+              emptyText="No tienes seguimientos registrados."
+              getProyecto={(record) => record.nombreProyecto}
+              getEstado={(record) => record.estadoCronograma}
+              getFecha={(record) => record.fechaInicio}
+              getFechaLabel={() => "Fecha inicio"}
+              getDetalle={(record) => `Avances registrados: ${record.cantidadAvances || 0}`}
+              onOpen={(record) =>
+                record?.idCronograma &&
+                navigate(`/cronogramas/${record.idCronograma}/seguimiento`)
+              }
+            />
           ) : (
-            <TableContainer component={Paper} sx={{ borderRadius: 3 }}>
-              <Table>
+            <TableContainer component={Paper} sx={compactTableContainerSx}>
+              <Table size="small" sx={compactTableSx}>
                 <TableHead>
-                  <TableRow sx={{ backgroundColor: "#F3F0FF" }}>
+                  <TableRow sx={{ backgroundColor: tableHeaderGreen }}>
                     {puedeVerColumnasInternas && (
                       <TableCell sx={{ fontWeight: "bold" }}>
                         ID Cronograma

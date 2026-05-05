@@ -5,7 +5,6 @@ import {
   Typography,
   Card,
   CardContent,
-  Grid,
   Chip,
   LinearProgress,
   Button,
@@ -21,10 +20,6 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  MenuItem,
-  Select,
-  FormControl,
-  InputLabel,
   Stack,
   Tooltip,
   Divider,
@@ -35,17 +30,13 @@ import SaveIcon from "@mui/icons-material/Save";
 import { useNotify } from "react-admin";
 import httpClient, { apiUrl } from "../../app/httpClient";
 
-const ESTADOS = [
-  "PENDIENTE",
-  "EN_PROCESO",
-  "COMPLETADA",
-  "ATRASADA",
-  "EN_REVISION",
-];
+const labelEstado = (estado) =>
+  estado === "TERMINADA" ? "COMPLETADA" : estado;
 
 const getEstadoColor = (estado) => {
   switch (estado) {
     case "COMPLETADA":
+    case "TERMINADA":
       return {
         bg: "#E8F5E9",
         text: "#2E7D32",
@@ -65,8 +56,8 @@ const getEstadoColor = (estado) => {
       };
     case "EN_REVISION":
       return {
-        bg: "#E3F2FD",
-        text: "#1565C0",
+        bg: "#E8F5E9",
+        text: "#2E7D32",
         chip: "info",
       };
     case "PENDIENTE":
@@ -77,6 +68,26 @@ const getEstadoColor = (estado) => {
         chip: "default",
       };
   }
+};
+
+const resumenCardSx = {
+  width: "100%",
+  minHeight: 126,
+  height: "100%",
+  borderRadius: 3,
+  boxShadow: 3,
+  display: "flex",
+  alignItems: "stretch",
+  "& .MuiCardContent-root": {
+    width: "100%",
+    minHeight: 126,
+    boxSizing: "border-box",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    px: 2.5,
+    py: 2,
+  },
 };
 
 const CronogramaVista = () => {
@@ -91,9 +102,7 @@ const CronogramaVista = () => {
   const [openEdit, setOpenEdit] = useState(false);
   const [detalleSeleccionado, setDetalleSeleccionado] = useState(null);
   const [formEdit, setFormEdit] = useState({
-    estado: "",
     trabajador: "",
-    porcentaje: 0,
     novedades: "",
   });
 
@@ -171,6 +180,44 @@ const verificarSeguimiento = async (idCronograma) => {
     return cronograma.detalles;
   }, [cronograma]);
 
+  const porcentajePorSemana = useMemo(() => {
+    const porcentajes = new Map();
+
+    detalles.forEach((detalle) => {
+      const numeroSemana = Number(detalle.semana);
+      if (!numeroSemana) return;
+
+      const porcentaje = Number(detalle.porcentaje || 0);
+      const porcentajeActual = porcentajes.get(numeroSemana) || 0;
+      porcentajes.set(numeroSemana, Math.max(porcentajeActual, porcentaje));
+    });
+
+    return porcentajes;
+  }, [detalles]);
+
+  const obtenerPorcentajeAcumulado = (detalle) => {
+    const numeroSemana = Number(detalle?.semana);
+    const totalSemanas = semanas.length;
+
+    if (!numeroSemana || !totalSemanas) {
+      return 0;
+    }
+
+    let sumaSemanas = 0;
+    porcentajePorSemana.forEach((porcentaje, semana) => {
+      if (Number(semana) <= numeroSemana) {
+        sumaSemanas += Number(porcentaje || 0);
+      }
+    });
+
+    return Math.min(100, Math.round(sumaSemanas / totalSemanas));
+  };
+
+  const totalColumnasTabla =
+    2 + (esCliente ? 0 : 1) + semanas.length + 2 + (esSupervisor ? 1 : 0);
+
+  const anchoColumnaSemana = semanas.length >= 9 ? 90 : 105;
+
   const avanceGeneral = useMemo(() => {
     if (cronograma?.avanceGeneral !== undefined && cronograma?.avanceGeneral !== null) {
       return cronograma.avanceGeneral;
@@ -187,11 +234,16 @@ const verificarSeguimiento = async (idCronograma) => {
   }, [cronograma, detalles]);
 
   const abrirEdicion = (detalle) => {
+    if (detalle.estado !== "EN_PROCESO") {
+      notify("Solo se pueden editar actividades en estado EN_PROCESO", {
+        type: "warning",
+      });
+      return;
+    }
+
     setDetalleSeleccionado(detalle);
     setFormEdit({
-      estado: detalle.estado || "PENDIENTE",
       trabajador: detalle.trabajador || "",
-      porcentaje: detalle.porcentaje || 0,
       novedades: detalle.novedades || "",
     });
     setOpenEdit(true);
@@ -201,9 +253,7 @@ const verificarSeguimiento = async (idCronograma) => {
     setOpenEdit(false);
     setDetalleSeleccionado(null);
     setFormEdit({
-      estado: "",
       trabajador: "",
-      porcentaje: 0,
       novedades: "",
     });
   };
@@ -228,12 +278,10 @@ const verificarSeguimiento = async (idCronograma) => {
     try {
       setGuardando(true);
 
-      await httpClient(`${apiUrl}/api/cronogramas/detalle/${idDetalle}`, {
+      await httpClient(`${apiUrl}/api/cliente/cronogramas/detalle/${idDetalle}`, {
         method: "PUT",
         body: JSON.stringify({
-          estado: formEdit.estado,
           trabajador: formEdit.trabajador,
-          porcentaje: Number(formEdit.porcentaje),
           novedades: formEdit.novedades,
         }),
       });
@@ -273,7 +321,7 @@ const verificarSeguimiento = async (idCronograma) => {
     return (
       <Tooltip
         title={`${detalle.actividad || detalle.descripcion || "Actividad"} - ${
-          detalle.estado || "PENDIENTE"
+          labelEstado(detalle.estado || "PENDIENTE")
         }`}
       >
         <Box
@@ -310,7 +358,16 @@ const verificarSeguimiento = async (idCronograma) => {
   }
 
   return (
-    <Box p={3}>
+    <Box
+      sx={{
+        width: "100%",
+        maxWidth: "calc(100vw - 48px)",
+        mx: "auto",
+        px: { xs: 1, md: 0 },
+        py: 3,
+        overflowX: "hidden",
+      }}
+    >
       <Stack
   direction="row"
   justifyContent="space-between"
@@ -320,7 +377,7 @@ const verificarSeguimiento = async (idCronograma) => {
   gap={2}
 >
   <Typography variant="h4" fontWeight="bold">
-    Cronograma cotización #{cronograma.idCotizacion || idCotizacion}
+    Cronograma
   </Typography>
 
     <Stack direction="row" spacing={2} flexWrap="wrap">
@@ -330,7 +387,7 @@ const verificarSeguimiento = async (idCronograma) => {
         color="success"
         disabled={verificandoSeguimiento || tieneSeguimiento}
         onClick={() =>
-          navigate(`/cronogramas/${cronograma.idCronograma}/seguimiento?nuevo=1`)
+          navigate(`/cronogramas/${cronograma.idCronograma}/seguimiento`)
         }
         sx={{ textTransform: "none", borderRadius: 2 }}
       >
@@ -372,9 +429,21 @@ const verificarSeguimiento = async (idCronograma) => {
   </Stack>
 </Stack>
 
-      <Grid container spacing={2} mb={3}>
-        <Grid item xs={12} md={3}>
-          <Card sx={{ borderRadius: 3, boxShadow: 3 }}>
+      <Box
+        sx={{
+          mb: 3,
+          display: "grid",
+          gridTemplateColumns: {
+            xs: "1fr",
+            sm: "repeat(2, minmax(180px, 1fr))",
+            md: "repeat(5, 180px)",
+          },
+          gap: 2,
+          alignItems: "stretch",
+        }}
+      >
+        <Box>
+          <Card sx={resumenCardSx}>
             <CardContent>
               <Typography variant="body2" color="text.secondary">
                 Proyecto
@@ -384,10 +453,10 @@ const verificarSeguimiento = async (idCronograma) => {
               </Typography>
             </CardContent>
           </Card>
-        </Grid>
+        </Box>
 
-        <Grid item xs={12} md={2}>
-          <Card sx={{ borderRadius: 3, boxShadow: 3 }}>
+        <Box>
+          <Card sx={resumenCardSx}>
             <CardContent>
               <Typography variant="body2" color="text.secondary">
                 Estado cronograma
@@ -403,10 +472,10 @@ const verificarSeguimiento = async (idCronograma) => {
               />
             </CardContent>
           </Card>
-        </Grid>
+        </Box>
 
-        <Grid item xs={12} md={2}>
-          <Card sx={{ borderRadius: 3, boxShadow: 3 }}>
+        <Box>
+          <Card sx={resumenCardSx}>
             <CardContent>
               <Typography variant="body2" color="text.secondary">
                 Fecha inicio
@@ -416,10 +485,10 @@ const verificarSeguimiento = async (idCronograma) => {
               </Typography>
             </CardContent>
           </Card>
-        </Grid>
+        </Box>
 
-        <Grid item xs={12} md={2}>
-          <Card sx={{ borderRadius: 3, boxShadow: 3 }}>
+        <Box>
+          <Card sx={resumenCardSx}>
             <CardContent>
               <Typography variant="body2" color="text.secondary">
                 Fecha fin
@@ -429,10 +498,10 @@ const verificarSeguimiento = async (idCronograma) => {
               </Typography>
             </CardContent>
           </Card>
-        </Grid>
+        </Box>
 
-        <Grid item xs={12} md={3}>
-          <Card sx={{ borderRadius: 3, boxShadow: 3 }}>
+        <Box>
+          <Card sx={resumenCardSx}>
             <CardContent>
               <Typography variant="body2" color="text.secondary" mb={1}>
                 Avance general
@@ -450,10 +519,10 @@ const verificarSeguimiento = async (idCronograma) => {
               />
             </CardContent>
           </Card>
-        </Grid>
-      </Grid>
+        </Box>
+      </Box>
 
-      <Card sx={{ borderRadius: 4, boxShadow: 4 }}>
+      <Card sx={{ borderRadius: 4, boxShadow: 4, width: "100%" }}>
         <CardContent>
           <Typography variant="h6" fontWeight="bold" mb={2}>
             Plan de actividades
@@ -461,38 +530,71 @@ const verificarSeguimiento = async (idCronograma) => {
 
           <Divider sx={{ mb: 2 }} />
 
-          <TableContainer component={Paper} sx={{ borderRadius: 3 }}>
-            <Table>
+          <TableContainer
+            component={Paper}
+            sx={{
+              borderRadius: 3,
+              overflowX: "hidden",
+              width: "100%",
+            }}
+          >
+            <Table
+              size="small"
+              sx={{
+                width: "100%",
+                tableLayout: "fixed",
+                "& .MuiTableCell-root": {
+                  px: { xs: 0.6, md: 0.8 },
+                  py: 1.2,
+                  verticalAlign: "middle",
+                  overflowWrap: "anywhere",
+                  wordBreak: "break-word",
+                },
+              }}
+            >
               <TableHead>
-                <TableRow sx={{ backgroundColor: "#F3F0FF" }}>
-                  <TableCell sx={{ fontWeight: "bold" }}>Actividad</TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }}>Estado</TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }}>Trabajador</TableCell>
+                <TableRow sx={{ backgroundColor: "#E8F5E9" }}>
+                  <TableCell sx={{ fontWeight: "bold", width: 210 }}>Actividad</TableCell>
+                  <TableCell sx={{ fontWeight: "bold", width: 130 }}>Estado</TableCell>
+                  {!esCliente && (
+                    <TableCell sx={{ fontWeight: "bold", width: 120 }}>Trabajador</TableCell>
+                  )}
 
                   {semanas.map((semana) => (
                     <TableCell
                       key={semana.numero}
                       align="center"
-                      sx={{ fontWeight: "bold", minWidth: 120 }}
+                      sx={{
+                        fontWeight: "bold",
+                        width: anchoColumnaSemana,
+                        minWidth: 0,
+                      }}
                     >
                       <Box>
-                        <Typography variant="body2" fontWeight="bold">
+                        <Typography
+                          variant="caption"
+                          fontWeight="bold"
+                          display="block"
+                          sx={{ lineHeight: 1.2 }}
+                        >
                           Semana {semana.numero}
                         </Typography>
-                        <Typography variant="caption" display="block">
+                        <Typography variant="caption" display="block" sx={{ lineHeight: 1.25 }}>
                           {semana.inicio}
                         </Typography>
-                        <Typography variant="caption" display="block">
+                        <Typography variant="caption" display="block" sx={{ lineHeight: 1.25 }}>
                           {semana.fin}
                         </Typography>
                       </Box>
                     </TableCell>
                   ))}
 
-                  <TableCell sx={{ fontWeight: "bold" }}>%</TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }}>Novedades</TableCell>
+                  <TableCell sx={{ fontWeight: "bold", width: 58 }}>%</TableCell>
+                  <TableCell sx={{ fontWeight: "bold", width: esCliente ? 100 : 150 }}>
+                    Novedades
+                  </TableCell>
                   {esSupervisor && (
-                    <TableCell sx={{ fontWeight: "bold" }}>Acciones</TableCell>
+                    <TableCell sx={{ fontWeight: "bold", width: 105 }}>Acciones</TableCell>
                   )}
                 </TableRow>
               </TableHead>
@@ -501,7 +603,7 @@ const verificarSeguimiento = async (idCronograma) => {
                 {detalles.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={semanas.length + (esSupervisor ? 7 : 6)}
+                      colSpan={totalColumnasTabla}
                       align="center"
                     >
                       No hay actividades registradas
@@ -526,7 +628,7 @@ const verificarSeguimiento = async (idCronograma) => {
 
                         <TableCell>
                           <Chip
-                            label={detalle.estado || "PENDIENTE"}
+                            label={labelEstado(detalle.estado || "PENDIENTE")}
                             sx={{
                               fontWeight: "bold",
                               backgroundColor: estiloEstado.bg,
@@ -535,37 +637,46 @@ const verificarSeguimiento = async (idCronograma) => {
                           />
                         </TableCell>
 
-                        <TableCell>{detalle.trabajador || "-"}</TableCell>
+                        {!esCliente && (
+                          <TableCell>{detalle.trabajador || "-"}</TableCell>
+                        )}
 
                         {semanas.map((semana) => (
                           <TableCell
                             key={`${detalle.idDetalle || index}-sem-${semana.numero}`}
                             align="center"
+                            sx={{ width: anchoColumnaSemana }}
                           >
                             {renderBarraSemana(detalle, semana)}
                           </TableCell>
                         ))}
 
-                        <TableCell>{detalle.porcentaje || 0}%</TableCell>
+                        <TableCell align="center">
+                          {obtenerPorcentajeAcumulado(detalle)}%
+                        </TableCell>
 
-                        <TableCell sx={{ minWidth: 180 }}>
+                        <TableCell>
                           {detalle.novedades || "-"}
                         </TableCell>
 
                         {esSupervisor && (
                           <TableCell>
-                            <Button
-                              variant="contained"
-                              size="small"
-                              startIcon={<EditIcon />}
-                              onClick={() => abrirEdicion(detalle)}
-                              sx={{
-                                borderRadius: 2,
-                                textTransform: "none",
-                              }}
-                            >
-                              Editar
-                            </Button>
+                            {detalle.estado === "EN_PROCESO" ? (
+                              <Button
+                                variant="contained"
+                                size="small"
+                                startIcon={<EditIcon />}
+                                onClick={() => abrirEdicion(detalle)}
+                                sx={{
+                                  borderRadius: 2,
+                                  textTransform: "none",
+                                }}
+                              >
+                                Editar
+                              </Button>
+                            ) : (
+                              "-"
+                            )}
                           </TableCell>
                         )}
                       </TableRow>
@@ -601,37 +712,11 @@ const verificarSeguimiento = async (idCronograma) => {
               disabled
             />
 
-            <FormControl fullWidth>
-              <InputLabel>Estado</InputLabel>
-              <Select
-                name="estado"
-                value={formEdit.estado}
-                label="Estado"
-                onChange={handleChangeEdit}
-              >
-                {ESTADOS.map((estado) => (
-                  <MenuItem key={estado} value={estado}>
-                    {estado}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
             <TextField
               label="Trabajador"
               name="trabajador"
               value={formEdit.trabajador}
               onChange={handleChangeEdit}
-              fullWidth
-            />
-
-            <TextField
-              label="Porcentaje"
-              name="porcentaje"
-              type="number"
-              value={formEdit.porcentaje}
-              onChange={handleChangeEdit}
-              inputProps={{ min: 0, max: 100 }}
               fullWidth
             />
 

@@ -37,6 +37,88 @@ const formatearNumero = (valor) => {
 
 const toNumber = (valor) => Number(valor || 0);
 
+const formatearAreaPrivada = (valor) => {
+  if (valor === null || valor === undefined || valor === "") return "-";
+  return `${formatearNumero(valor)} m²`;
+};
+
+const obtenerNombreServicio = (item) => {
+  if (!item) return "";
+  if (typeof item === "string") return item.trim();
+
+  return (
+    item.nombreServicio ||
+    item.servicio ||
+    item.nombre ||
+    item?.servicios?.nombreServicio ||
+    item?.servicio?.nombreServicio ||
+    ""
+  )
+    .toString()
+    .trim();
+};
+
+const obtenerServiciosSeleccionados = (cotizacion, detalles = []) => {
+  const origenServicios =
+    cotizacion?.serviciosSeleccionados ||
+    cotizacion?.solicitudServicios ||
+    cotizacion?.servicios ||
+    cotizacion?.solicitud?.serviciosSeleccionados ||
+    [];
+
+  const serviciosDirectos = Array.isArray(origenServicios)
+    ? origenServicios.map(obtenerNombreServicio)
+    : [obtenerNombreServicio(origenServicios)];
+
+  const serviciosDetalle = detalles.map((item) =>
+    obtenerNombreServicio({
+      nombreServicio: item?.nombreServicio || item?.servicio,
+    })
+  );
+
+  return [...new Set([...serviciosDirectos, ...serviciosDetalle])]
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b));
+};
+
+const obtenerMedidaAreaPrivada = (cotizacion) =>
+  cotizacion?.medidaAreaPrivada ??
+  cotizacion?.areaPrivada ??
+  cotizacion?.manoObra?.medidaAreaPrivada ??
+  cotizacion?.cotizacionManoObra?.medidaAreaPrivada ??
+  null;
+
+const filtroSelectSx = {
+  minWidth: 260,
+  "& .MuiOutlinedInput-root": {
+    minHeight: 45,
+    borderRadius: "10px",
+    backgroundColor: "#2e7d32",
+    color: "#ffffff",
+    fontWeight: 700,
+    "& fieldset": {
+      borderColor: "#2e7d32",
+    },
+    "&:hover fieldset": {
+      borderColor: "#1b5e20",
+    },
+    "&.Mui-focused fieldset": {
+      borderColor: "#1b5e20",
+      borderWidth: 2,
+    },
+  },
+  "& .MuiInputLabel-root": {
+    color: "#ffffff",
+    fontWeight: 700,
+  },
+  "& .MuiInputLabel-root.Mui-focused": {
+    color: "#ffffff",
+  },
+  "& .MuiSelect-icon": {
+    color: "#ffffff",
+  },
+};
+
 const estilos = {
   tabla: {
     width: "100%",
@@ -63,6 +145,9 @@ const estilos = {
     border: "1px solid #ddd",
     textAlign: "center",
     minHeight: "100px",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
   },
   tdSemana: {
     border: "1px solid #ccc",
@@ -257,6 +342,8 @@ const CotizacionVista = () => {
   const [openAprobar, setOpenAprobar] = useState(false);
   const [fechaInicio, setFechaInicio] = useState("");
   const [aprobando, setAprobando] = useState(false);
+  const [cronogramaCotizacion, setCronogramaCotizacion] = useState(null);
+  const [consultandoCronograma, setConsultandoCronograma] = useState(false);
   const notify = useNotify();
 
   const idRol = Number(localStorage.getItem("idRol"));
@@ -273,6 +360,15 @@ const CotizacionVista = () => {
   useEffect(() => {
     cargarCotizacion();
   }, [idCotizacion]);
+
+  useEffect(() => {
+    if (normalizarTexto(cotizacion?.estado) === "aprobada") {
+      cargarCronogramaCotizacion();
+    } else {
+      setCronogramaCotizacion(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cotizacion?.estado, idCotizacion]);
 
   const cargarCotizacion = async () => {
     setLoading(true);
@@ -291,6 +387,9 @@ const CotizacionVista = () => {
         totalManoObra: json.totalManoObra ?? 0,
         totalMateriales: json.totalMateriales ?? 0,
         totalProductos: json.totalProductos ?? 0,
+        medidaAreaPrivada: json.medidaAreaPrivada ?? null,
+        serviciosSeleccionados:
+          json.serviciosSeleccionados || json.solicitudServicios || [],
         totalEstimado: json.totalEstimado ?? 0,
         totalEstimadoBase:
           json.totalEstimadoBase ??
@@ -337,6 +436,9 @@ const CotizacionVista = () => {
           totalManoObra: json.totalManoObra ?? 0,
           totalMateriales: json.totalMateriales ?? 0,
           totalProductos: json.totalProductos ?? 0,
+          medidaAreaPrivada: json.medidaAreaPrivada ?? null,
+          serviciosSeleccionados:
+            json.serviciosSeleccionados || json.solicitudServicios || [],
           totalEstimado: json.totalEstimado ?? totalBase,
           totalEstimadoBase: totalBase,
           totalAdicionales: 0,
@@ -355,6 +457,35 @@ const CotizacionVista = () => {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const cargarCronogramaCotizacion = async (mostrarError = false) => {
+    try {
+      setConsultandoCronograma(true);
+
+      const { json } = await httpClient(
+        `${apiUrl}/api/cliente/cronogramas/cotizacion/${idCotizacion}`
+      );
+
+      setCronogramaCotizacion(json);
+      return json;
+    } catch (error) {
+      console.error("Error cargando cronograma de cotizacion:", error);
+      setCronogramaCotizacion(null);
+
+      if (mostrarError) {
+        notify(
+          error?.body?.message ||
+            error?.message ||
+            "No se pudo cargar el cronograma de la cotizacion",
+          { type: "error" }
+        );
+      }
+
+      return null;
+    } finally {
+      setConsultandoCronograma(false);
     }
   };
 
@@ -479,6 +610,14 @@ const CotizacionVista = () => {
 
   const detalles = useMemo(() => detallesBase(cotizacion), [cotizacion]);
 
+  const medidaAreaPrivada = useMemo(() => {
+    return obtenerMedidaAreaPrivada(cotizacion);
+  }, [cotizacion]);
+
+  const serviciosSeleccionados = useMemo(() => {
+    return obtenerServiciosSeleccionados(cotizacion, detalles);
+  }, [cotizacion, detalles]);
+
   const detallesCarpinteria = useMemo(() => {
     return detalles.filter(esDetalleCarpinteria);
   }, [detalles]);
@@ -540,8 +679,6 @@ const CotizacionVista = () => {
       ? totalesFiltrados.totalMateriales
       : toNumber(cotizacion?.totalMateriales);
 
-  const totalProductosMostrar = toNumber(cotizacion?.totalProductos);
-
   const totalBaseMostrar =
     toNumber(cotizacion?.totalManoObra) +
     toNumber(cotizacion?.totalMateriales) +
@@ -557,6 +694,26 @@ const CotizacionVista = () => {
   const limpiarFiltros = () => {
     setFiltroSemana("");
     setFiltroActividad("");
+  };
+
+  const cotizacionAprobada = normalizarTexto(cotizacion?.estado) === "aprobada";
+
+  const irACronograma = () => {
+    navigate(`/cronogramas/cotizacion/${idCotizacion}`);
+  };
+
+  const irASeguimiento = async () => {
+    const cronograma =
+      cronogramaCotizacion || (await cargarCronogramaCotizacion(true));
+
+    if (!cronograma?.idCronograma) {
+      notify("No se encontro cronograma para esta cotizacion", {
+        type: "warning",
+      });
+      return;
+    }
+
+    navigate(`/cronogramas/${cronograma.idCronograma}/seguimiento`);
   };
 
   if (loading) {
@@ -587,21 +744,43 @@ const CotizacionVista = () => {
           Proyecto: {cotizacion.nombreProyecto}
         </Typography>
 
-        <Typography variant="body1" sx={{ mb: 4 }}>
-          Estado: <strong>{cotizacion.estado}</strong>
-        </Typography>
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" },
+            gap: 1,
+            mb: 4,
+          }}
+        >
+          <Typography variant="body1">
+            Estado: <strong>{cotizacion.estado}</strong>
+          </Typography>
+
+          <Typography variant="body1">
+            Área privada: <strong>{formatearAreaPrivada(medidaAreaPrivada)}</strong>
+          </Typography>
+
+          <Typography variant="body1" sx={{ gridColumn: { md: "1 / -1" } }}>
+            Servicios seleccionados:{" "}
+            <strong>
+              {serviciosSeleccionados.length > 0
+                ? serviciosSeleccionados.join(", ")
+                : "-"}
+            </strong>
+          </Typography>
+        </Box>
 
         <Grid container spacing={2} mb={4}>
-          <Grid item xs={12} md={2}>
+          <Grid item xs={12} sm={6} md={3}>
             <Box sx={estilos.resumenCard}>
-              <Typography variant="subtitle2">Total Mano de Obra</Typography>
+              <Typography variant="subtitle2">Total Obra Blanca</Typography>
               <Typography variant="h6">
                 {formatearMoneda(totalManoObraMostrar)}
               </Typography>
             </Box>
           </Grid>
 
-          <Grid item xs={12} md={2}>
+          <Grid item xs={12} sm={6} md={3}>
             <Box sx={estilos.resumenCard}>
               <Typography variant="subtitle2">Total Materiales</Typography>
               <Typography variant="h6">
@@ -610,16 +789,34 @@ const CotizacionVista = () => {
             </Box>
           </Grid>
 
-          <Grid item xs={12} md={2}>
+          <Grid item xs={12} sm={6} md={3}>
             <Box sx={estilos.resumenCard}>
-              <Typography variant="subtitle2">Total Productos</Typography>
+              <Typography variant="subtitle2">Total Carpintería</Typography>
               <Typography variant="h6">
-                {formatearMoneda(totalProductosMostrar)}
+                {formatearMoneda(totalCarpinteria)}
               </Typography>
             </Box>
           </Grid>
 
-          <Grid item xs={12} md={2}>
+          <Grid item xs={12} sm={6} md={3}>
+            <Box sx={estilos.resumenCard}>
+              <Typography variant="subtitle2">Total Divisiones en Vidrio</Typography>
+              <Typography variant="h6">
+                {formatearMoneda(totalVidrio)}
+              </Typography>
+            </Box>
+          </Grid>
+
+          <Grid item xs={12} sm={6} md={3}>
+            <Box sx={estilos.resumenCard}>
+              <Typography variant="subtitle2">Total Mesones Mármol</Typography>
+              <Typography variant="h6">
+                {formatearMoneda(totalMezon)}
+              </Typography>
+            </Box>
+          </Grid>
+
+          <Grid item xs={12} sm={6} md={3}>
             <Box sx={estilos.resumenCard}>
               <Typography variant="subtitle2">Total Base</Typography>
               <Typography variant="h6">
@@ -628,7 +825,7 @@ const CotizacionVista = () => {
             </Box>
           </Grid>
 
-          <Grid item xs={12} md={2}>
+          <Grid item xs={12} sm={6} md={3}>
             <Box sx={estilos.resumenCard}>
               <Typography variant="subtitle2">Total Adicionales</Typography>
               <Typography variant="h6">
@@ -637,7 +834,7 @@ const CotizacionVista = () => {
             </Box>
           </Grid>
 
-          <Grid item xs={12} md={2}>
+          <Grid item xs={12} sm={6} md={3}>
             <Box sx={estilos.resumenCard}>
               <Typography variant="subtitle2">Total General</Typography>
               <Typography variant="h6">
@@ -647,19 +844,39 @@ const CotizacionVista = () => {
           </Grid>
         </Grid>
 
-        {esCliente && (
+        <Box display="flex" gap={2} flexWrap="wrap" mb={3}>
+          {esCliente && (
+            <Button
+              variant="contained"
+              color="success"
+              onClick={() => setOpenAprobar(true)}
+              disabled={
+                cotizacion?.estado === "APROBADA" ||
+                cotizacion?.estado === "RECHAZADA"
+              }
+            >
+              APROBAR
+            </Button>
+          )}
+
           <Button
             variant="contained"
-            color="success"
-            onClick={() => setOpenAprobar(true)}
-            disabled={
-              cotizacion?.estado === "APROBADA" ||
-              cotizacion?.estado === "RECHAZADA"
-            }
+            color="primary"
+            onClick={irACronograma}
+            disabled={!cotizacionAprobada}
           >
-            APROBAR
+            VER CRONOGRAMA
           </Button>
-        )}
+
+          <Button
+            variant="outlined"
+            color="primary"
+            onClick={irASeguimiento}
+            disabled={!cotizacionAprobada || consultandoCronograma}
+          >
+            {consultandoCronograma ? "CARGANDO..." : "VER SEGUIMIENTO"}
+          </Button>
+        </Box>
 
         <Typography variant="h5" fontWeight="bold" mb={2} mt={4}>
           Filtros
@@ -675,14 +892,7 @@ const CotizacionVista = () => {
               onChange={(e) => setFiltroSemana(e.target.value)}
               variant="outlined"
               size="medium"
-              sx={{
-                minWidth: 260,
-                "& .MuiOutlinedInput-root": {
-                  minHeight: 45,
-                  borderRadius: "10px",
-                  backgroundColor: "#14d106",
-                },
-              }}
+              sx={filtroSelectSx}
             >
               <MenuItem value="">Todas</MenuItem>
               {semanasDisponibles.map((semana) => (
@@ -702,14 +912,7 @@ const CotizacionVista = () => {
               onChange={(e) => setFiltroActividad(e.target.value)}
               variant="outlined"
               size="medium"
-              sx={{
-                minWidth: 260,
-                "& .MuiOutlinedInput-root": {
-                  minHeight: 45,
-                  borderRadius: "10px",
-                  backgroundColor: "#14d106",
-                },
-              }}
+              sx={filtroSelectSx}
             >
               <MenuItem value="">Todas</MenuItem>
               {actividadesDisponibles.map((actividad) => (
@@ -728,9 +931,10 @@ const CotizacionVista = () => {
             <Button
               variant="contained"
               color="success"
-              onClick={() => navigate("/cotizaciones")}
+              onClick={() => navigate(`/cotizacion-base/${idCotizacion}/editar`)}
+              disabled={cotizacion?.estado === "APROBADA"}
             >
-              VOLVER
+              VOLVER/EDITAR
             </Button>
 
             {esCliente && (
@@ -1040,8 +1244,18 @@ const CotizacionVista = () => {
             </Typography>
 
             <Typography sx={{ mb: 1 }}>
-              <strong>Total productos:</strong>{" "}
-              {formatearMoneda(totalProductosMostrar)}
+              <strong>Total carpintería:</strong>{" "}
+              {formatearMoneda(totalCarpinteria)}
+            </Typography>
+
+            <Typography sx={{ mb: 1 }}>
+              <strong>Total divisiones en vidrio:</strong>{" "}
+              {formatearMoneda(totalVidrio)}
+            </Typography>
+
+            <Typography sx={{ mb: 1 }}>
+              <strong>Total mesones mármol:</strong>{" "}
+              {formatearMoneda(totalMezon)}
             </Typography>
 
             <Typography sx={{ mb: 1 }}>

@@ -24,6 +24,8 @@ const SolicitudShow = () => {
   const puedeMarcarRealizada = esAdmin || esSupervisor;
 
   const [loading, setLoading] = useState(true);
+  const [confirmando, setConfirmando] = useState(false);
+  const [marcandoRealizada, setMarcandoRealizada] = useState(false);
   const [solicitud, setSolicitud] = useState(null);
 
   const cargarSolicitud = async () => {
@@ -55,7 +57,8 @@ const SolicitudShow = () => {
 
   const handleMarcarRealizada = async () => {
     try {
-      await httpClient(`${apiUrl}/api/solicitudes/${idSolicitud}/realizada`, {
+      setMarcandoRealizada(true);
+      const { json } = await httpClient(`${apiUrl}/api/solicitudes/${idSolicitud}/realizada`, {
         method: "PUT",
         headers: new Headers({
           "Content-Type": "application/json"
@@ -66,7 +69,7 @@ const SolicitudShow = () => {
         type: "success"
       });
 
-      navigate("/solicitudes");
+      setSolicitud(json);
     } catch (error) {
       console.error(error);
       notify(
@@ -75,6 +78,40 @@ const SolicitudShow = () => {
           "No se pudo marcar la visita como realizada",
         { type: "error" }
       );
+    } finally {
+      setMarcandoRealizada(false);
+    }
+  };
+
+  const handleConfirmarVisita = async () => {
+    try {
+      setConfirmando(true);
+
+      const { json } = await httpClient(
+        `${apiUrl}/api/solicitudes/${idSolicitud}/confirmar-visita`,
+        {
+          method: "PUT",
+          headers: new Headers({
+            "Content-Type": "application/json"
+          })
+        }
+      );
+
+      notify("Visita tecnica confirmada y notificada al cliente", {
+        type: "success"
+      });
+
+      setSolicitud(json);
+    } catch (error) {
+      console.error(error);
+      notify(
+        error?.body?.message ||
+          error?.message ||
+          "No se pudo confirmar la visita tecnica",
+        { type: "error" }
+      );
+    } finally {
+      setConfirmando(false);
     }
   };
 
@@ -89,6 +126,10 @@ const SolicitudShow = () => {
 
     if (estado === "REPROGRAMADA") {
       return <Chip label="REPROGRAMADA" color="secondary" />;
+    }
+
+    if (estado === "CONFIRMADA") {
+      return <Chip label="CONFIRMADA" color="primary" />;
     }
 
     if (estado === "REALIZADA") {
@@ -132,13 +173,23 @@ const SolicitudShow = () => {
   }
 
   const esVisitaTecnica = solicitud.tipoSolicitud === "VISITA_TECNICA";
+  const visitaEditable =
+    solicitud?.estado === "PENDIENTE" ||
+    solicitud?.estado === "REPROGRAMADA";
+  const visitaPuedeRealizarse =
+    visitaEditable ||
+    solicitud?.estado === "CONFIRMADA";
+  const puedeConfirmarVisita =
+    esVisitaTecnica && esSupervisor && visitaEditable;
+  const puedeMarcarVisitaRealizada =
+    esVisitaTecnica && puedeMarcarRealizada && visitaPuedeRealizarse;
 
   return (
     <Box p={3}>
       <Card sx={{ maxWidth: 1000, mx: "auto", borderRadius: 3, boxShadow: 3 }}>
         <CardContent>
           <Typography variant="h4" fontWeight="bold" mb={3}>
-            Ver Solicitud
+            Solicitud
           </Typography>
 
           <Grid container spacing={2}>
@@ -254,20 +305,30 @@ const SolicitudShow = () => {
               Volver
             </Button>
 
-            {esVisitaTecnica &&
-              solicitud?.estado !== "REALIZADA" &&
-              puedeMarcarRealizada && (
-                <Button
-                  variant="contained"
-                  onClick={handleMarcarRealizada}
-                  sx={{
-                    backgroundColor: "#0aa000",
-                    "&:hover": { backgroundColor: "#088500" }
-                  }}
-                >
-                  Realizada
-                </Button>
-              )}
+            {puedeConfirmarVisita && (
+              <Button
+                variant="contained"
+                color="success"
+                onClick={handleConfirmarVisita}
+                disabled={confirmando}
+              >
+                {confirmando ? "Confirmando..." : "Confirmar"}
+              </Button>
+            )}
+
+            {puedeMarcarVisitaRealizada && (
+              <Button
+                variant="contained"
+                onClick={handleMarcarRealizada}
+                disabled={marcandoRealizada}
+                sx={{
+                  backgroundColor: "#2e7d32",
+                  "&:hover": { backgroundColor: "#1b5e20" }
+                }}
+              >
+                {marcandoRealizada ? "Guardando..." : "Realizada"}
+              </Button>
+            )}
           </Box>
         </CardContent>
       </Card>

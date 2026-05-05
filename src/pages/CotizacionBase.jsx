@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import {
   Box,
   Paper,
@@ -12,7 +12,7 @@ import {
   Button,
   Divider,
 } from "@mui/material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import httpClient, { apiUrl } from "../app/httpClient";
 
 const tiposCielo = ["ESTUCO", "DRYWALL"];
@@ -87,15 +87,46 @@ const obtenerCantidadesMueblesBano = (cantidadBanos, seleccionados = {}) => {
   );
 };
 
+const crearSeleccionMueblesBanoDesdeCantidades = (
+  cantidadBanos,
+  cantidadAltos = 0,
+  cantidadBajos = 0
+) => {
+  const seleccion = {};
+  let altosPendientes = toEnteroNoNegativo(cantidadAltos);
+  let bajosPendientes = toEnteroNoNegativo(cantidadBajos);
+
+  crearOpcionesMueblesBano(cantidadBanos).forEach((opcion) => {
+    if (opcion.tipo === "alto") {
+      seleccion[opcion.id] = altosPendientes > 0;
+      altosPendientes -= seleccion[opcion.id] ? 1 : 0;
+      return;
+    }
+
+    seleccion[opcion.id] = bajosPendientes > 0;
+    bajosPendientes -= seleccion[opcion.id] ? 1 : 0;
+  });
+
+  return seleccion;
+};
+
+const valorInput = (valor) =>
+  valor === null || valor === undefined ? "" : String(valor);
+
 const CotizacionBase = () => {
   const navigate = useNavigate();
+  const { idCotizacion } = useParams();
+  const modoEdicion = Boolean(idCotizacion);
+  const esCliente = Number(localStorage.getItem("idRol")) === 3;
 
   const [loading, setLoading] = useState(true);
   const [serviciosSeleccionados, setServiciosSeleccionados] = useState([]);
+  const [solicitudActualId, setSolicitudActualId] = useState(null);
+  const [cotizacionEditada, setCotizacionEditada] = useState(null);
 
   const [formDataManoObra, setFormDataManoObra] = useState({
     medidaAreaPrivada: "",
-    cantidadBanos: "",
+    cantidadBanos: "0",
     tipoCielo: "ESTUCO",
     divisionPared: false,
     
@@ -128,12 +159,17 @@ const CotizacionBase = () => {
   });
 
   useEffect(() => {
+    if (modoEdicion) {
+      cargarCotizacionParaEditar();
+      return;
+    }
+
     cargarSolicitud();
-  }, []);
+  }, [idCotizacion]);
 
   const cargarSolicitud = async () => {
     try {
-      const idSolicitud = localStorage.getItem("idSolicitud");
+      const idSolicitud = solicitudActualId || localStorage.getItem("idSolicitud");
 
       if (!idSolicitud) {
         alert("No se encontró idSolicitud.");
@@ -143,6 +179,7 @@ const CotizacionBase = () => {
 
       const { json } = await httpClient(`${apiUrl}/api/solicitudes/${idSolicitud}`);
       const data = json;
+      setSolicitudActualId(Number(idSolicitud));
 
       console.log("Solicitud cargada:", data);
 
@@ -161,6 +198,90 @@ const CotizacionBase = () => {
       alert("No se pudo cargar la solicitud.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const cargarCotizacionParaEditar = async () => {
+    setLoading(true);
+
+    try {
+      const url = esCliente
+        ? `${apiUrl}/api/cliente/cotizaciones/${idCotizacion}/base-formulario`
+        : `${apiUrl}/api/cotizaciones/${idCotizacion}/base-formulario`;
+
+      const { json } = await httpClient(url);
+
+      setCotizacionEditada(json);
+      setSolicitudActualId(json.solicitudId);
+
+      if (json.solicitudId) {
+        localStorage.setItem("idSolicitud", String(json.solicitudId));
+      }
+
+      setServiciosSeleccionados(json.serviciosSeleccionados || []);
+      cargarDatosFormularioEdicion(json);
+    } catch (error) {
+      console.error("Error al cargar cotizaciÃ³n para editar:", error);
+      alert(
+        error?.body?.message ||
+          error?.message ||
+          "No se pudo cargar la cotizaciÃ³n para editar."
+      );
+      navigate(`/cotizaciones/${idCotizacion}/vista`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const cargarDatosFormularioEdicion = (data) => {
+    const manoObra = data?.manoObra;
+    if (manoObra) {
+      setFormDataManoObra({
+        medidaAreaPrivada: valorInput(manoObra.medidaAreaPrivada),
+        cantidadBanos: valorInput(manoObra.cantidadBanos ?? 0),
+        tipoCielo: manoObra.tipoCielo || "ESTUCO",
+        divisionPared: !!manoObra.divisionPared,
+      });
+    }
+
+    const carpinteria = data?.carpinteria;
+    if (carpinteria) {
+      const cantidadBanos = valorInput(carpinteria.cantidadBanos);
+      setFormDataCarpinteria({
+        cantidadCloset: valorInput(carpinteria.cantidadCloset),
+        cantidadPuertas: valorInput(carpinteria.cantidadPuertas),
+        muebleAltoCocina: valorInput(carpinteria.muebleAltoCocina),
+        muebleBajoCocina: valorInput(carpinteria.muebleBajoCocina),
+        muebleBarra: valorInput(carpinteria.muebleBarra),
+        cantidadBanos,
+        mueblesBanoSeleccionados: crearSeleccionMueblesBanoDesdeCantidades(
+          cantidadBanos,
+          carpinteria.cantidadMuebleAltoBano,
+          carpinteria.cantidadMuebleBajoBano
+        ),
+      });
+    }
+
+    const vidrio = data?.vidrio;
+    if (vidrio) {
+      setFormDataVidrio({
+        cantidadBanos: valorInput(vidrio.cantidadBanos),
+        tipoApertura: vidrio.tipoApertura || "",
+        colorAccesorios: vidrio.colorAccesorios || "",
+        tieneNicho: !!vidrio.tieneNicho,
+      });
+    }
+
+    const mezon = data?.mezon;
+    if (mezon) {
+      setFormDataMezon({
+        mezonCocina: !!mezon.mezonCocina,
+        mezonBarra: !!mezon.mezonBarra,
+        mezonLavamanos: !!mezon.mezonLavamanos,
+        medidaCocina: valorInput(mezon.medidaCocina),
+        medidaBarra: valorInput(mezon.medidaBarra),
+        medidaLavamanos: valorInput(mezon.medidaLavamanos),
+      });
     }
   };
 
@@ -202,6 +323,17 @@ const CotizacionBase = () => {
     setFormDataManoObra((prev) => ({
       ...prev,
       [name]: checked,
+    }));
+  };
+
+  const handleBlurManoObra = (e) => {
+    const { name } = e.target;
+
+    if (name !== "cantidadBanos") return;
+
+    setFormDataManoObra((prev) => ({
+      ...prev,
+      cantidadBanos: String(toEnteroNoNegativo(prev.cantidadBanos)),
     }));
   };
 
@@ -268,10 +400,6 @@ const CotizacionBase = () => {
     if (seccionManoObraVisible) {
       if (!formDataManoObra.medidaAreaPrivada) {
         alert("Debe ingresar la medida del área privada.");
-        return false;
-      }
-      if (!formDataManoObra.cantidadBanos) {
-        alert("Debe ingresar la cantidad de baños.");
         return false;
       }
       if (!formDataManoObra.tipoCielo) {
@@ -376,9 +504,7 @@ const CotizacionBase = () => {
               medidaAreaPrivada: formDataManoObra.medidaAreaPrivada
                 ? Number(formDataManoObra.medidaAreaPrivada)
                 : null,
-              cantidadBanos: formDataManoObra.cantidadBanos
-                ? Number(formDataManoObra.cantidadBanos)
-                : null,
+              cantidadBanos: toEnteroNoNegativo(formDataManoObra.cantidadBanos),
               tipoCielo: formDataManoObra.tipoCielo || null,
               divisionPared: !!formDataManoObra.divisionPared
             }
@@ -437,8 +563,14 @@ const CotizacionBase = () => {
 
       console.log("Payload generar cotización:", payload);
 
-      const { json } = await httpClient(`${apiUrl}/api/cliente/cotizaciones/generar-base`, {
-        method: "POST",
+      const urlGuardar = modoEdicion
+        ? esCliente
+          ? `${apiUrl}/api/cliente/cotizaciones/${idCotizacion}/base`
+          : `${apiUrl}/api/cotizaciones/${idCotizacion}/base`
+        : `${apiUrl}/api/cliente/cotizaciones/generar-base`;
+
+      const { json } = await httpClient(urlGuardar, {
+        method: modoEdicion ? "PUT" : "POST",
         body: JSON.stringify(payload),
       });
 
@@ -449,10 +581,11 @@ const CotizacionBase = () => {
         return;
       }
 
-       // ACTUALIZAR ESTADO DE LA SOLICITUD
-      await httpClient(`${apiUrl}/api/solicitudes/${idSolicitud}/generar`, {
-        method: "PUT",
-      });
+      if (!modoEdicion) {
+        await httpClient(`${apiUrl}/api/solicitudes/${idSolicitud}/generar`, {
+          method: "PUT",
+        });
+      }
 
       navigate(`/cotizaciones/${json.idCotizacion}/vista`);
     } catch (error) {
@@ -493,6 +626,7 @@ const CotizacionBase = () => {
     formDataMezon.mezonCocina ||
     formDataMezon.mezonBarra ||
     formDataMezon.mezonLavamanos;
+  const cotizacionAprobada = cotizacionEditada?.estado === "APROBADA";
 
   return (
     <Box p={4}>
@@ -501,6 +635,15 @@ const CotizacionBase = () => {
           Cotización Base
         </Typography>
 
+        {modoEdicion && (
+          <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 1 }}>
+            Editando cotizacion #{idCotizacion}
+            {cotizacionEditada?.nombreProyecto
+              ? ` - ${cotizacionEditada.nombreProyecto}`
+              : ""}
+          </Typography>
+        )}
+
         <Typography variant="h6" sx={{ mb: 4 }}>
           Complete la información según los servicios seleccionados en la solicitud.
         </Typography>
@@ -508,7 +651,7 @@ const CotizacionBase = () => {
         {seccionManoObraVisible && (
           <>
             <Typography variant="h4" fontWeight="bold" sx={{ mb: 3 }}>
-              Sección Mano de Obra
+              Sección Obra Blanca
             </Typography>
 
             <Grid container spacing={3} alignItems="center">
@@ -532,8 +675,9 @@ const CotizacionBase = () => {
                   name="cantidadBanos"
                   value={formDataManoObra.cantidadBanos}
                   onChange={handleChangeManoObra}
+                  onBlur={handleBlurManoObra}
                   type="number"
-                  inputProps={{ min: 0 }}
+                  inputProps={{ min: 0, step: 1 }}
                   variant="standard"
                 />
               </Grid>
@@ -565,7 +709,7 @@ const CotizacionBase = () => {
                       name="divisionPared"
                     />
                   }
-                  label="¿División en pared?"
+                  label="¿Cierre espacio multiple?"
                 />
               </Grid>
             </Grid>
@@ -704,8 +848,19 @@ const CotizacionBase = () => {
               Sección Divisiones en Vidrio
             </Typography>
 
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={3}>
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: {
+                  xs: "1fr",
+                  sm: "repeat(2, minmax(220px, 1fr))",
+                  lg: "repeat(4, minmax(220px, 1fr))",
+                },
+                gap: 3,
+                alignItems: "center",
+              }}
+            >
+              <Box>
                 <TextField
                   fullWidth
                   label="Cantidad baños"
@@ -715,17 +870,18 @@ const CotizacionBase = () => {
                   type="number"
                   variant="standard"
                 />
-              </Grid>
+              </Box>
 
-              <Grid item xs={12} md={3}>
+              <Box>
                 <TextField
                   fullWidth
                   select
-                  label="Tipo apertura"
+                  label="Tipo de apertura"
                   name="tipoApertura"
                   value={formDataVidrio.tipoApertura}
                   onChange={handleChangeVidrio}
                   variant="standard"
+                  InputLabelProps={{ shrink: true }}
                 >
                   {tiposApertura.map((tipo) => (
                     <MenuItem key={tipo} value={tipo}>
@@ -733,17 +889,18 @@ const CotizacionBase = () => {
                     </MenuItem>
                   ))}
                 </TextField>
-              </Grid>
+              </Box>
 
-              <Grid item xs={12} md={3}>
+              <Box>
                 <TextField
                   fullWidth
                   select
-                  label="Color accesorios"
+                  label="Color de accesorios"
                   name="colorAccesorios"
                   value={formDataVidrio.colorAccesorios}
                   onChange={handleChangeVidrio}
                   variant="standard"
+                  InputLabelProps={{ shrink: true }}
                 >
                   {coloresAccesorios.map((color) => (
                     <MenuItem key={color} value={color}>
@@ -751,9 +908,9 @@ const CotizacionBase = () => {
                     </MenuItem>
                   ))}
                 </TextField>
-              </Grid>
+              </Box>
 
-              <Grid item xs={12} md={3}>
+              <Box>
                 <FormControlLabel
                   control={
                     <Switch
@@ -764,8 +921,8 @@ const CotizacionBase = () => {
                   }
                   label="¿Tiene nicho?"
                 />
-              </Grid>
-            </Grid>
+              </Box>
+            </Box>
 
             <Divider sx={{ my: 4 }} />
           </>
@@ -925,7 +1082,11 @@ const CotizacionBase = () => {
           <Button
             variant="outlined"
             color="primary"
-            onClick={() => navigate("/solicitudes")}
+            onClick={() =>
+              modoEdicion
+                ? navigate(`/cotizaciones/${idCotizacion}/vista`)
+                : navigate("/solicitudes")
+            }
           >
             Cancelar
           </Button>
@@ -934,6 +1095,16 @@ const CotizacionBase = () => {
             variant="contained"
             color="success"
             onClick={handleGenerarCotizacion}
+            disabled={cotizacionAprobada}
+            sx={{
+              fontSize: 0,
+              "&::after": {
+                content: modoEdicion
+                  ? '"ACTUALIZAR COTIZACION"'
+                  : '"GENERAR COTIZACION"',
+                fontSize: "0.875rem",
+              },
+            }}
           >
             GENERAR COTIZACIÓN
           </Button>

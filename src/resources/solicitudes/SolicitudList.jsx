@@ -17,6 +17,7 @@ import Tooltip from "@mui/material/Tooltip";
 import { Box, Chip } from "@mui/material";
 
 import SolicitudVacia from "./SolicitudVacia";
+import { compactDatagridSx, compactListSx } from "../../app/listStyles";
 
 /* ===============================
    BOTÓN CREAR COTIZACIÓN
@@ -36,8 +37,8 @@ const CrearCotizacionButton = ({ record }) => {
       size="small"
       onClick={handleClick}
       sx={{
-        backgroundColor: "#0aa000",
-        "&:hover": { backgroundColor: "#088500" }
+        backgroundColor: "#2e7d32",
+        "&:hover": { backgroundColor: "#1b5e20" }
       }}
     >
       Crear Cotización
@@ -98,8 +99,15 @@ const SolicitudList = () => {
       filter={puedeVerTodo ? {} : { correoUsuario }}
       sort={{ field: "idSolicitud", order: "DESC" }}
       perPage={10}
+      storeKey={false}
+      sx={compactListSx}
     >
-      <Datagrid rowClick={false} bulkActionButtons={false}>
+      <Datagrid
+        rowClick={false}
+        bulkActionButtons={false}
+        size="small"
+        sx={compactDatagridSx}
+      >
         {puedeVerColumnasInternas && (
           <TextField source="idSolicitud" label="ID" />
         )}
@@ -128,6 +136,10 @@ const SolicitudList = () => {
 
             if (record.estado === "REPROGRAMADA") {
               return <Chip label="REPROGRAMADA" color="secondary" />;
+            }
+
+            if (record.estado === "CONFIRMADA") {
+              return <Chip label="CONFIRMADA" color="primary" />;
             }
 
             return record.estado;

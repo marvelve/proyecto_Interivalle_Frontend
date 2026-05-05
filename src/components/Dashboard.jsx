@@ -1,4 +1,4 @@
-import logo from "../assets/Logo_interivalle.jpg";
+import logo from "../assets/Logo_interivalle.png";
 
 const Dashboard = () => {
   return (

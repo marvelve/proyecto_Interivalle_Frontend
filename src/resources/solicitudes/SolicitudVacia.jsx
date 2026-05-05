@@ -25,9 +25,9 @@ const SolicitudVacia = () => {
             sx={{
               borderRadius: 3,
               fontWeight: "bold",
-              backgroundColor: "#0aa000",
+              backgroundColor: "#2e7d32",
               "&:hover": {
-                backgroundColor: "#088500",
+                backgroundColor: "#1b5e20",
               },
             }}
           >

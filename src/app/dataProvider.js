@@ -32,6 +32,49 @@ const mapIdField = (data) => {
   };
 };
 
+const defaultSortFieldByResource = {
+  solicitudes: "idSolicitud",
+  cotizaciones: "idCotizacion",
+  cronogramas: "idCronograma",
+  "catalogo-items": "idCatalogoItem",
+};
+
+const applySortAndPagination = (json, params = {}, resource) => {
+  let data = mapIdField(Array.isArray(json) ? json : []);
+  const fallbackField = defaultSortFieldByResource[resource] || "id";
+  const sortField = params.sort?.field === "id"
+    ? fallbackField
+    : params.sort?.field || fallbackField;
+  const sortOrder = params.sort?.order || "DESC";
+
+  data = [...data].sort((a, b) => {
+    const aValue = a?.[sortField] ?? a?.id ?? 0;
+    const bValue = b?.[sortField] ?? b?.id ?? 0;
+
+    if (typeof aValue === "number" && typeof bValue === "number") {
+      return sortOrder === "ASC" ? aValue - bValue : bValue - aValue;
+    }
+
+    const comparison = String(aValue).localeCompare(String(bValue), "es", {
+      numeric: true,
+      sensitivity: "base",
+    });
+
+    return sortOrder === "ASC" ? comparison : -comparison;
+  });
+
+  const total = data.length;
+  const page = params.pagination?.page || 1;
+  const perPage = params.pagination?.perPage || total || 10;
+  const start = (page - 1) * perPage;
+  const end = start + perPage;
+
+  return {
+    data: data.slice(start, end),
+    total,
+  };
+};
+
 const dataProvider = {
   ...baseDataProvider,
 
@@ -47,10 +90,7 @@ getList: async (resource, params) => {
 
     const { json } = await httpClient(url);
 
-    return {
-      data: mapIdField(json),
-      total: Array.isArray(json) ? json.length : 0,
-    };
+    return applySortAndPagination(json, params, resource);
   }
 
   if (resource === "cotizaciones") {
@@ -74,19 +114,13 @@ getList: async (resource, params) => {
 
     const { json } = await httpClient(url);
 
-    return {
-      data: mapIdField(json),
-      total: Array.isArray(json) ? json.length : 0,
-    };
+    return applySortAndPagination(json, params, resource);
   }
 
    if (resource === "cronogramas") {
       const { json } = await httpClient(`${apiUrl}/api/cliente/cronogramas`);
 
-      return {
-        data: mapIdField(json),
-        total: Array.isArray(json) ? json.length : 0,
-      };
+      return applySortAndPagination(json, params, resource);
     }
 
     if (resource === "catalogo-items") {
@@ -127,10 +161,7 @@ getList: async (resource, params) => {
           );
         }
 
-        return {
-          data,
-          total: data.length,
-        };
+        return applySortAndPagination(data, params, resource);
       }
 
   const response = await baseDataProvider.getList(resource, params);

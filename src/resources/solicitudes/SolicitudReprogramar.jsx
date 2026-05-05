@@ -90,6 +90,14 @@ const SolicitudReprogramar = () => {
         `${apiUrl}/api/solicitudes/${idSolicitud}`
       );
 
+      if (json?.estado === "CONFIRMADA" || json?.estado === "REALIZADA") {
+        notify("La visita tecnica ya no se puede reprogramar", {
+          type: "warning"
+        });
+        navigate(`/solicitudes/${idSolicitud}/show`);
+        return;
+      }
+
       setFormData({
         idSolicitud: json?.idSolicitud || "",
         nombreProyecto: json?.nombreProyecto || "",
@@ -282,8 +290,8 @@ const SolicitudReprogramar = () => {
               onClick={handleReprogramar}
               disabled={guardando}
               sx={{
-                backgroundColor: "#0aa000",
-                "&:hover": { backgroundColor: "#088500" }
+                backgroundColor: "#2e7d32",
+                "&:hover": { backgroundColor: "#1b5e20" }
               }}
             >
               {guardando ? "Reprogramando..." : "Reprogramar"}

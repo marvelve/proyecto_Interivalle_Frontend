@@ -12,6 +12,8 @@ import {
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import AddIcon from "@mui/icons-material/Add";
 import CotizacionVacia from "./CotizacionVacia";
+import { compactDatagridSx, compactListSx } from "../../app/listStyles";
+import { ClienteProyectoCardsFromList } from "../../components/ClienteProyectoCards";
 
 const CotizacionActions = () => {
   const redirect = useRedirect();
@@ -48,6 +50,33 @@ const CotizacionList = () => {
 
   const filtros = esCliente ? { correoUsuario } : {};
 
+  if (esCliente) {
+    return (
+      <List
+        title="Cotizaciones"
+        actions={<CotizacionActions />}
+        empty={<CotizacionVacia />}
+        perPage={10}
+        sort={{ field: "idCotizacion", order: "DESC" }}
+        filter={filtros}
+        storeKey={false}
+        sx={compactListSx}
+      >
+        <ClienteProyectoCardsFromList
+          emptyText="No tienes cotizaciones registradas."
+          getProyecto={(record) => record.nombreProyecto}
+          getEstado={(record) => record.estado}
+          getFecha={(record) => record.fechaCreacion}
+          getFechaLabel={() => "Fecha"}
+          onOpen={(record) =>
+            record?.idCotizacion &&
+            redirect(`/cotizaciones/${record.idCotizacion}/vista`)
+          }
+        />
+      </List>
+    );
+  }
+
   return (
     <List
       title="Cotizaciones"
@@ -56,8 +85,15 @@ const CotizacionList = () => {
       perPage={10}
       sort={{ field: "idCotizacion", order: "DESC" }}
       filter={filtros}
+      storeKey={false}
+      sx={compactListSx}
     >
-      <Datagrid bulkActionButtons={false} rowClick={false}>
+      <Datagrid
+        bulkActionButtons={false}
+        rowClick={false}
+        size="small"
+        sx={compactDatagridSx}
+      >
         {puedeVerColumnasInternas && (
           <TextField source="idCotizacion" label="ID" />
         )}

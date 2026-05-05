@@ -11,7 +11,10 @@ import {
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import SeguimientoForm from "./seguimientoForm";
 import SeguimientoDetalle from "./SeguimientoDetalle";
-import { listarAvancesPorCronograma } from "./seguimientoService";
+import {
+  listarAvancesPorCronograma,
+  obtenerCronogramaPorId,
+} from "./seguimientoService";
 
 const SeguimientoList = () => {
   const { idCronograma } = useParams();
@@ -23,6 +26,7 @@ const SeguimientoList = () => {
   const [mostrarForm, setMostrarForm] = useState(false);
   const [avanceEditar, setAvanceEditar] = useState(null);
   const [avanceSeleccionado, setAvanceSeleccionado] = useState(null);
+  const [cronogramaInfo, setCronogramaInfo] = useState(null);
 
   const idRol = Number(localStorage.getItem("idRol"));
   const puedeEditar = idRol === 1 || idRol === 2;
@@ -30,7 +34,16 @@ const SeguimientoList = () => {
   const cargarAvances = async () => {
     try {
       setLoading(true);
-      const data = await listarAvancesPorCronograma(idCronograma);
+      const [data, cronograma] = await Promise.all([
+        listarAvancesPorCronograma(idCronograma),
+        obtenerCronogramaPorId(idCronograma).catch((error) => {
+          console.error("Error cargando proyecto del cronograma:", error);
+          return null;
+        }),
+      ]);
+
+      setCronogramaInfo(cronograma || null);
+      setAvanceSeleccionado(null);
       setAvances(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error cargando avances:", error);
@@ -40,6 +53,12 @@ const SeguimientoList = () => {
       setLoading(false);
     }
   };
+
+  const nombreProyecto =
+    cronogramaInfo?.nombreProyecto ||
+    cronogramaInfo?.proyecto ||
+    cronogramaInfo?.nombre ||
+    "";
 
   useEffect(() => {
     if (idCronograma) {
@@ -56,6 +75,20 @@ const SeguimientoList = () => {
       setAvanceSeleccionado(null);
     }
   }, [searchParams, avances, puedeEditar]);
+
+  useEffect(() => {
+    const idAvance = Number(searchParams.get("avance"));
+
+    if (!idAvance || loading || avances.length === 0) {
+      return;
+    }
+
+    const avance = avances.find((item) => Number(item.idAvance) === idAvance);
+
+    if (avance) {
+      setAvanceSeleccionado(avance);
+    }
+  }, [searchParams, avances, loading]);
 
   const handleNuevo = () => {
     setAvanceEditar(null);
@@ -85,9 +118,23 @@ const SeguimientoList = () => {
         flexWrap="wrap"
         gap={2}
       >
-        <Typography variant="h4" fontWeight="bold">
-          Seguimiento de obra
-        </Typography>
+        <Box>
+          <Typography variant="h4" fontWeight="bold">
+            Seguimiento de obra
+          </Typography>
+
+          <Typography
+            variant="h6"
+            sx={{
+              mt: 0.5,
+              color: "#2E7D32",
+              fontWeight: 800,
+              lineHeight: 1.25,
+            }}
+          >
+            Proyecto: {nombreProyecto || "Cargando proyecto..."}
+          </Typography>
+        </Box>
 
         <Box display="flex" gap={2} flexWrap="wrap">
           {puedeEditar && (

@@ -64,16 +64,29 @@ const NotificacionesMenu = () => {
     setAnchorEl(null);
   };
 
-  const irSegunModulo = (n) => {
+  const irSegunModulo = async (n) => {
     if (n.modulo === "VISITA_TECNICA" && n.idReferencia) {
     navigate(`/solicitudes/${n.idReferencia}/show`);
       return;
     }
 
     if (n.modulo === "AVANCE" && n.idReferencia) {
-    navigate(`/cronogramas/${n.idReferencia}/seguimiento`);
-    return;
-  }
+      try {
+        const avance = await NotificacionService.obtenerAvance(n.idReferencia);
+
+        if (avance?.idCronograma) {
+          navigate(
+            `/cronogramas/${avance.idCronograma}/seguimiento?avance=${n.idReferencia}`
+          );
+          return;
+        }
+      } catch (error) {
+        console.error("Error resolviendo avance de notificaciÃ³n", error);
+      }
+
+      navigate(`/cronogramas/${n.idReferencia}/seguimiento`);
+      return;
+    }
 
     if (n.modulo === "CRONOGRAMA") {
       navigate("/cronogramas");
@@ -94,7 +107,7 @@ const NotificacionesMenu = () => {
       await cargarContador();
       await cargarNoLeidas();
       handleClose();
-      irSegunModulo(n);
+      await irSegunModulo(n);
     } catch (error) {
       console.error("Error marcando notificación", error);
     }

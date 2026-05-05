@@ -10,6 +10,8 @@ import {
   useRedirect,
 } from "react-admin";
 import VisibilityIcon from "@mui/icons-material/Visibility";
+import { compactDatagridSx, compactListSx } from "../../app/listStyles";
+import { ClienteProyectoCardsFromList } from "../../components/ClienteProyectoCards";
 
 const CronogramaActions = () => {
   return <TopToolbar />;
@@ -32,6 +34,37 @@ const CronogramaList = () => {
 
   const filtros = esCliente ? { correoUsuario } : {};
 
+  if (esCliente) {
+    return (
+      <List
+        title="Cronogramas"
+        actions={<CronogramaActions />}
+        perPage={10}
+        sort={{ field: "idCronograma", order: "DESC" }}
+        filter={filtros}
+        storeKey={false}
+        sx={compactListSx}
+      >
+        <ClienteProyectoCardsFromList
+          emptyText="No tienes cronogramas registrados."
+          getProyecto={(record) => record.nombreProyecto}
+          getEstado={(record) => record.estadoCronograma}
+          getFecha={(record) => record.fechaInicio}
+          getFechaLabel={() => "Fecha inicio"}
+          getDetalle={(record) =>
+            record.fechaFin
+              ? `Fecha fin: ${String(record.fechaFin).replace(/^(\d{4})-(\d{2})-(\d{2}).*/, "$3/$2/$1")} · Avance: ${record.avanceGeneral || 0}%`
+              : `Avance: ${record.avanceGeneral || 0}%`
+          }
+          onOpen={(record) =>
+            record?.idCotizacion &&
+            redirect(`/cronogramas/cotizacion/${record.idCotizacion}`)
+          }
+        />
+      </List>
+    );
+  }
+
   return (
     <List
       title="Cronogramas"
@@ -39,8 +72,15 @@ const CronogramaList = () => {
       perPage={10}
       sort={{ field: "idCronograma", order: "DESC" }}
       filter={filtros}
+      storeKey={false}
+      sx={compactListSx}
     >
-      <Datagrid bulkActionButtons={false} rowClick={false}>
+      <Datagrid
+        bulkActionButtons={false}
+        rowClick={false}
+        size="small"
+        sx={compactDatagridSx}
+      >
         {puedeVerColumnasInternas && (
           <TextField source="idCronograma" label="ID Cronograma" />
         )}

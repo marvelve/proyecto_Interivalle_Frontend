@@ -3,11 +3,13 @@ import { Route } from "react-router-dom";
 
 import authProvider from "./authProvider";
 import dataProvider from "./dataProvider";
+import appTheme from "./theme";
 
 import Dashboard from "../components/Dashboard";
 import CustomMenu from "../components/CustomMenu";
 import CustomAppBar from "../components/CustomAppBar";
 
+import LandingInterivalle from "../pages/landing_interivalle";
 import LoginPage from "../pages/LoginPage";
 import Register from "../pages/Register";
 import CotizacionBase from "../pages/CotizacionBase";
@@ -39,11 +41,40 @@ import CatalogoItemList from "../resources/Catalogo/CatalogoItemList";
 import CatalogoItemEdit from "../resources/Catalogo/CatalogoItemEdit";
 import CatalogoItemCreate from "../resources/Catalogo/CatalogoItemCreate";
 
+const HorizontalMenuArea = ({ children }) => (
+  <div
+    style={{
+      width: "100%",
+      background: "#f7faf7",
+      borderBottom: "1px solid #d8ead9",
+    }}
+  >
+    {children}
+  </div>
+);
+
 const CustomLayout = (props) => (
   <Layout
     {...props}
     menu={CustomMenu}
     appBar={CustomAppBar}
+    sidebar={HorizontalMenuArea}
+    appBarAlwaysOn
+    sx={{
+      "& .RaLayout-appFrame": {
+        marginTop: "56px",
+      },
+      "& .RaLayout-contentWithSidebar": {
+        flexDirection: "column",
+        width: "100%",
+      },
+      "& .RaLayout-content": {
+        width: "100%",
+        maxWidth: "100%",
+        paddingLeft: { xs: 1.5, md: 2.5 },
+        paddingRight: { xs: 1.5, md: 2.5 },
+      },
+    }}
   />
 );
 
@@ -55,13 +86,16 @@ const App = () => {
       dataProvider={dataProvider}
       layout={CustomLayout}
       loginPage={LoginPage}
+      theme={appTheme}
     >
       <CustomRoutes noLayout>
+        <Route path="/" element={<LandingInterivalle />} />
         <Route path="/register" element={<Register />} />
       </CustomRoutes>
 
       <CustomRoutes>
         <Route path="/cotizacion-base" element={<CotizacionBase />} />
+        <Route path="/cotizacion-base/:idCotizacion/editar" element={<CotizacionBase />} />
         <Route path="/cotizaciones/:idCotizacion/vista" element={<CotizacionVista />} />
         <Route
           path="/cotizacion-personalizada/formularios/:idCotizacion"

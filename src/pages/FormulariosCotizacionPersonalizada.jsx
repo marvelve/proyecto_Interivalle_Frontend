@@ -614,7 +614,7 @@ const FormulariosCotizacionPersonalizada = () => {
               value={obraBlanca}
               onChange={setObraBlanca}
               errors={errores[1]}
-              titulo="Formulario Mano de Obra / Obra Blanca"
+              titulo="Formulario Obra Blanca"
               disabled={cotizacionCerrada || guardando}
             />
           )}
@@ -666,11 +666,11 @@ const FormulariosCotizacionPersonalizada = () => {
               onClick={handleGenerarYVer}
               disabled={guardando || cotizacionCerrada}
               sx={{
-                backgroundColor: "#0aa000",
-                "&:hover": { backgroundColor: "#088500" },
+                backgroundColor: "#2e7d32",
+                "&:hover": { backgroundColor: "#1b5e20" },
               }}
             >
-              {guardando ? "Procesando..." : "COTIZACIÓN PERSONALIZADA"}
+              {guardando ? "Procesando..." : "GUARDAR"}
             </Button>
           </Box>
         </CardContent>
