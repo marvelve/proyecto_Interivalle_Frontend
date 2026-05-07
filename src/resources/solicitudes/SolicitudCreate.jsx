@@ -453,9 +453,18 @@ const SolicitudCreate = () => {
 
               {!esVisitaTecnica && (
               <Button
-                variant="contained"
+                variant="outlined"
                 onClick={handleGuardar}
                 disabled={loading}
+                sx={{
+                  bgcolor: "#ffffff",
+                  color: "#2e7d32",
+                  borderColor: "#2e7d32",
+                  "&:hover": {
+                    bgcolor: "#f7fbf7",
+                    borderColor: "#1b5e20"
+                  }
+                }}
               >
                 {loading ? "Guardando..." : "Guardar"}
               </Button>

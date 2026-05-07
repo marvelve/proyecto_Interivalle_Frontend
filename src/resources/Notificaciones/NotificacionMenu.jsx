@@ -94,6 +94,10 @@ const NotificacionesMenu = () => {
     }
 
     if (n.modulo === "COTIZACION") {
+      if (n.idReferencia) {
+        navigate(`/cotizaciones/${n.idReferencia}/vista`);
+        return;
+      }
       navigate("/cotizaciones");
       return;
     }

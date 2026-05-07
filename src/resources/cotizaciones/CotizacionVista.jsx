@@ -12,7 +12,10 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  IconButton,
 } from "@mui/material";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 
 import { useNotify } from "react-admin";
 import { useNavigate, useParams } from "react-router-dom";
@@ -41,6 +44,29 @@ const formatearAreaPrivada = (valor) => {
   if (valor === null || valor === undefined || valor === "") return "-";
   return `${formatearNumero(valor)} m²`;
 };
+
+const formatearFecha = (valor) => {
+  if (!valor) return "-";
+  const fecha = valor.toString().substring(0, 10);
+  const partes = fecha.split("-");
+  if (partes.length !== 3) return fecha;
+  return `${partes[2]}/${partes[1]}/${partes[0]}`;
+};
+
+const crearFechaLocal = (valor) => {
+  if (!valor) return new Date();
+  const [year, month, day] = valor.toString().substring(0, 10).split("-");
+  return new Date(Number(year), Number(month) - 1, Number(day));
+};
+
+const claveFechaLocal = (fecha) => {
+  const year = fecha.getFullYear();
+  const month = String(fecha.getMonth() + 1).padStart(2, "0");
+  const day = String(fecha.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const diasSemanaCalendario = ["Dom", "Lun", "Mar", "Mie", "Jue", "Vie", "Sab"];
 
 const obtenerNombreServicio = (item) => {
   if (!item) return "";
@@ -344,18 +370,16 @@ const CotizacionVista = () => {
   const [aprobando, setAprobando] = useState(false);
   const [cronogramaCotizacion, setCronogramaCotizacion] = useState(null);
   const [consultandoCronograma, setConsultandoCronograma] = useState(false);
+  const [fechasInicioDisponibles, setFechasInicioDisponibles] = useState([]);
+  const [cargandoFechasInicio, setCargandoFechasInicio] = useState(false);
+  const [mesCalendario, setMesCalendario] = useState(() => {
+    const hoy = new Date();
+    return new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+  });
   const notify = useNotify();
 
   const idRol = Number(localStorage.getItem("idRol"));
   const esCliente = idRol === 3;
-
-  const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
-
-  const manana = new Date(hoy);
-  manana.setDate(manana.getDate() + 1);
-
-  const minFecha = manana.toISOString().split("T")[0];
 
   useEffect(() => {
     cargarCotizacion();
@@ -369,6 +393,13 @@ const CotizacionVista = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cotizacion?.estado, idCotizacion]);
+
+  useEffect(() => {
+    if (openAprobar) {
+      cargarFechasInicioDisponibles();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openAprobar]);
 
   const cargarCotizacion = async () => {
     setLoading(true);
@@ -390,6 +421,8 @@ const CotizacionVista = () => {
         medidaAreaPrivada: json.medidaAreaPrivada ?? null,
         serviciosSeleccionados:
           json.serviciosSeleccionados || json.solicitudServicios || [],
+        cronogramaGenerado: Boolean(json.cronogramaGenerado),
+        idCronograma: json.idCronograma ?? null,
         totalEstimado: json.totalEstimado ?? 0,
         totalEstimadoBase:
           json.totalEstimadoBase ??
@@ -439,6 +472,8 @@ const CotizacionVista = () => {
           medidaAreaPrivada: json.medidaAreaPrivada ?? null,
           serviciosSeleccionados:
             json.serviciosSeleccionados || json.solicitudServicios || [],
+          cronogramaGenerado: Boolean(json.cronogramaGenerado),
+          idCronograma: json.idCronograma ?? null,
           totalEstimado: json.totalEstimado ?? totalBase,
           totalEstimadoBase: totalBase,
           totalAdicionales: 0,
@@ -471,7 +506,9 @@ const CotizacionVista = () => {
       setCronogramaCotizacion(json);
       return json;
     } catch (error) {
-      console.error("Error cargando cronograma de cotizacion:", error);
+      if (mostrarError) {
+        console.error("Error cargando cronograma de cotizacion:", error);
+      }
       setCronogramaCotizacion(null);
 
       if (mostrarError) {
@@ -489,6 +526,38 @@ const CotizacionVista = () => {
     }
   };
 
+  const cargarFechasInicioDisponibles = async () => {
+    try {
+      setCargandoFechasInicio(true);
+      setFechaInicio("");
+
+      const { json } = await httpClient(
+        `${apiUrl}/api/cliente/cronogramas/fechas-inicio-disponibles?dias=365`
+      );
+
+      const fechas = Array.isArray(json) ? json : [];
+      setFechasInicioDisponibles(fechas);
+
+      if (fechas.length > 0) {
+        const primeraFecha = crearFechaLocal(fechas[0].fechaInicio);
+        setMesCalendario(
+          new Date(primeraFecha.getFullYear(), primeraFecha.getMonth(), 1)
+        );
+      }
+    } catch (error) {
+      console.error("Error cargando fechas de inicio disponibles:", error);
+      setFechasInicioDisponibles([]);
+      notify(
+        error?.body?.message ||
+          error?.message ||
+          "No se pudieron cargar las fechas disponibles",
+        { type: "error" }
+      );
+    } finally {
+      setCargandoFechasInicio(false);
+    }
+  };
+
   const handleAprobar = async () => {
     try {
       if (!esCliente) {
@@ -500,6 +569,15 @@ const CotizacionVista = () => {
 
       if (!fechaInicio) {
         notify("Debes seleccionar la fecha de inicio", { type: "warning" });
+        return;
+      }
+
+      const fechaDisponible = fechasInicioDisponibles.some(
+        (item) => item?.fechaInicio === fechaInicio
+      );
+
+      if (!fechaDisponible) {
+        notify("Selecciona una fecha de inicio disponible", { type: "warning" });
         return;
       }
 
@@ -527,7 +605,8 @@ const CotizacionVista = () => {
 
       notify("Cotización aprobada correctamente", { type: "success" });
       setOpenAprobar(false);
-
+      await cargarCotizacion();
+      await cargarCronogramaCotizacion(false);
       navigate(`/cronogramas/cotizacion/${idCotizacion}`);
     } catch (error) {
       console.error(error);
@@ -697,8 +776,64 @@ const CotizacionVista = () => {
   };
 
   const cotizacionAprobada = normalizarTexto(cotizacion?.estado) === "aprobada";
+  const cronogramaDisponible = Boolean(
+    cronogramaCotizacion?.idCronograma ||
+      cotizacion?.idCronograma ||
+      cotizacion?.cronogramaGenerado
+  );
+
+  const fechasInicioDisponiblesSet = useMemo(() => {
+    return new Set(
+      fechasInicioDisponibles
+        .map((item) => item?.fechaInicio)
+        .filter(Boolean)
+    );
+  }, [fechasInicioDisponibles]);
+
+  const etiquetaMesCalendario = useMemo(() => {
+    return new Intl.DateTimeFormat("es-CO", {
+      month: "long",
+      year: "numeric",
+    }).format(mesCalendario);
+  }, [mesCalendario]);
+
+  const diasCalendario = useMemo(() => {
+    const inicioMes = new Date(
+      mesCalendario.getFullYear(),
+      mesCalendario.getMonth(),
+      1
+    );
+    const inicioGrilla = new Date(inicioMes);
+    inicioGrilla.setDate(inicioMes.getDate() - inicioMes.getDay());
+
+    return Array.from({ length: 42 }, (_, index) => {
+      const fecha = new Date(inicioGrilla);
+      fecha.setDate(inicioGrilla.getDate() + index);
+
+      const clave = claveFechaLocal(fecha);
+
+      return {
+        clave,
+        fecha,
+        disponible: fechasInicioDisponiblesSet.has(clave),
+        enMesActual: fecha.getMonth() === mesCalendario.getMonth(),
+        seleccionado: clave === fechaInicio,
+      };
+    });
+  }, [fechaInicio, fechasInicioDisponiblesSet, mesCalendario]);
+
+  const cambiarMesCalendario = (delta) => {
+    setMesCalendario(
+      (mesActual) =>
+        new Date(mesActual.getFullYear(), mesActual.getMonth() + delta, 1)
+    );
+  };
 
   const irACronograma = () => {
+    if (!cronogramaDisponible) {
+      notify("No se encontró cronograma para esta cotización", { type: "warning" });
+      return;
+    }
     navigate(`/cronogramas/cotizacion/${idCotizacion}`);
   };
 
@@ -863,7 +998,7 @@ const CotizacionVista = () => {
             variant="contained"
             color="primary"
             onClick={irACronograma}
-            disabled={!cotizacionAprobada}
+            disabled={!cotizacionAprobada || !cronogramaDisponible}
           >
             VER CRONOGRAMA
           </Button>
@@ -872,7 +1007,9 @@ const CotizacionVista = () => {
             variant="outlined"
             color="primary"
             onClick={irASeguimiento}
-            disabled={!cotizacionAprobada || consultandoCronograma}
+            disabled={
+              !cotizacionAprobada || !cronogramaDisponible || consultandoCronograma
+            }
           >
             {consultandoCronograma ? "CARGANDO..." : "VER SEGUIMIENTO"}
           </Button>
@@ -1285,16 +1422,107 @@ const CotizacionVista = () => {
             <DialogTitle>Fecha Inicio Obra</DialogTitle>
 
             <DialogContent>
-              <TextField
-                label="Fecha de inicio"
-                type="date"
-                fullWidth
-                margin="normal"
-                InputLabelProps={{ shrink: true }}
-                value={fechaInicio}
-                onChange={(e) => setFechaInicio(e.target.value)}
-                inputProps={{ min: minFecha }}
-              />
+              {cargandoFechasInicio ? (
+                <Box py={4} display="flex" alignItems="center" gap={2}>
+                  <CircularProgress size={24} />
+                  <Typography>Cargando fechas...</Typography>
+                </Box>
+              ) : fechasInicioDisponibles.length === 0 ? (
+                <Typography color="text.secondary" py={3}>
+                  No hay fechas disponibles.
+                </Typography>
+              ) : (
+                <Box mt={1}>
+                  <Box
+                    display="flex"
+                    alignItems="center"
+                    justifyContent="space-between"
+                    mb={2}
+                  >
+                    <IconButton
+                      aria-label="Mes anterior"
+                      onClick={() => cambiarMesCalendario(-1)}
+                      size="small"
+                    >
+                      <ChevronLeftIcon />
+                    </IconButton>
+
+                    <Typography fontWeight="bold" textTransform="capitalize">
+                      {etiquetaMesCalendario}
+                    </Typography>
+
+                    <IconButton
+                      aria-label="Mes siguiente"
+                      onClick={() => cambiarMesCalendario(1)}
+                      size="small"
+                    >
+                      <ChevronRightIcon />
+                    </IconButton>
+                  </Box>
+
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(7, 1fr)",
+                      gap: 0.75,
+                    }}
+                  >
+                    {diasSemanaCalendario.map((dia) => (
+                      <Typography
+                        key={dia}
+                        variant="caption"
+                        textAlign="center"
+                        fontWeight="bold"
+                        color="text.secondary"
+                      >
+                        {dia}
+                      </Typography>
+                    ))}
+
+                    {diasCalendario.map((dia) => (
+                      <Button
+                        key={dia.clave}
+                        variant={dia.seleccionado ? "contained" : "outlined"}
+                        color={dia.seleccionado ? "success" : "primary"}
+                        disabled={!dia.disponible}
+                        onClick={() => setFechaInicio(dia.clave)}
+                        sx={{
+                          minWidth: 0,
+                          height: 42,
+                          borderRadius: 1,
+                          fontWeight: dia.disponible ? 700 : 400,
+                          opacity: dia.enMesActual ? 1 : 0.35,
+                          bgcolor:
+                            dia.disponible && !dia.seleccionado
+                              ? "#e8f5e9"
+                              : undefined,
+                          borderColor:
+                            dia.disponible && !dia.seleccionado
+                              ? "#2e7d32"
+                              : undefined,
+                          color:
+                            dia.disponible && !dia.seleccionado
+                              ? "#1b5e20"
+                              : undefined,
+                          "&.Mui-disabled": {
+                            bgcolor: "#f3f3f3",
+                            color: "#9e9e9e",
+                            borderColor: "#e0e0e0",
+                          },
+                        }}
+                      >
+                        {dia.fecha.getDate()}
+                      </Button>
+                    ))}
+                  </Box>
+
+                  {fechaInicio && (
+                    <Typography color="success.main" mt={2} fontWeight="bold">
+                      Fecha seleccionada: {formatearFecha(fechaInicio)}
+                    </Typography>
+                  )}
+                </Box>
+              )}
             </DialogContent>
 
             <DialogActions>
@@ -1303,13 +1531,19 @@ const CotizacionVista = () => {
                 variant="contained"
                 color="success"
                 onClick={handleAprobar}
-                disabled={aprobando}
+                disabled={
+                  aprobando ||
+                  cargandoFechasInicio ||
+                  fechasInicioDisponibles.length === 0 ||
+                  !fechaInicio
+                }
               >
                 {aprobando ? "Aprobando..." : "Confirmar"}
               </Button>
             </DialogActions>
           </Dialog>
         )}
+
       </Paper>
     </Box>
   );

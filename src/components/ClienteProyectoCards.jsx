@@ -51,6 +51,28 @@ const estadoColor = (estado) => {
   }
 };
 
+const normalizarServicios = (value) => {
+  if (!value) return [];
+
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => {
+        if (typeof item === "string") return item;
+        return item?.nombreServicio || item?.nombre || item?.label || "";
+      })
+      .filter(Boolean);
+  }
+
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+};
+
 export const ClienteProyectoCards = ({
   records,
   loading,
@@ -59,6 +81,7 @@ export const ClienteProyectoCards = ({
   getEstado,
   getFecha,
   getFechaLabel = () => "Fecha",
+  getServicios,
   getDetalle,
   onOpen,
 }) => {
@@ -99,6 +122,7 @@ export const ClienteProyectoCards = ({
         const estado = getEstado(record);
         const color = estadoColor(estado);
         const detalle = getDetalle?.(record);
+        const servicios = normalizarServicios(getServicios?.(record));
 
         return (
           <Card
@@ -117,6 +141,7 @@ export const ClienteProyectoCards = ({
               borderRadius: 3,
               border: "1px solid #C8E6C9",
               boxShadow: "0 8px 22px rgba(46, 125, 50, 0.12)",
+              height: "100%",
               transition: "transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease",
               "&:hover": {
                 transform: "translateY(-3px)",
@@ -129,7 +154,14 @@ export const ClienteProyectoCards = ({
               },
             }}
           >
-            <CardContent sx={{ p: 2.5 }}>
+            <CardContent
+              sx={{
+                p: 2.5,
+                height: "100%",
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
               <Box display="flex" alignItems="flex-start" justifyContent="space-between" gap={2}>
                 <Box minWidth={0}>
                   <Typography variant="caption" color="text.secondary" fontWeight={700}>
@@ -167,6 +199,29 @@ export const ClienteProyectoCards = ({
                 </Typography>
               </Box>
 
+              {servicios.length > 0 && (
+                <Box mt={1.6}>
+                  <Typography variant="body2" color="text.secondary" fontWeight={700} mb={0.8}>
+                    Servicios
+                  </Typography>
+                  <Box display="flex" flexWrap="wrap" gap={0.8}>
+                    {servicios.map((servicio) => (
+                      <Chip
+                        key={servicio}
+                        label={servicio}
+                        size="small"
+                        sx={{
+                          bgcolor: "#F1F8E9",
+                          color: "#1B5E20",
+                          border: "1px solid #C8E6C9",
+                          fontWeight: 700,
+                        }}
+                      />
+                    ))}
+                  </Box>
+                </Box>
+              )}
+
               {detalle && (
                 <Typography variant="body2" color="text.secondary" mt={1.4}>
                   {detalle}
@@ -192,4 +247,3 @@ export const ClienteProyectoCardsFromList = (props) => {
     />
   );
 };
-

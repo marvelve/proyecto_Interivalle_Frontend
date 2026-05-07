@@ -24,7 +24,7 @@ const CotizacionActions = () => {
       {[1, 2, 3].includes(idRol) && (
         <Button
           label="Crear solicitud"
-          onClick={() => redirect("/solicitudes/nueva")}
+          onClick={() => redirect("/solicitudes/create")}
         >
           <AddIcon />
         </Button>
@@ -68,6 +68,11 @@ const CotizacionList = () => {
           getEstado={(record) => record.estado}
           getFecha={(record) => record.fechaCreacion}
           getFechaLabel={() => "Fecha"}
+          getServicios={(record) =>
+            record.serviciosSeleccionados ||
+            record.servicios ||
+            record.detalles?.map((detalle) => detalle.nombreServicio)
+          }
           onOpen={(record) =>
             record?.idCotizacion &&
             redirect(`/cotizaciones/${record.idCotizacion}/vista`)

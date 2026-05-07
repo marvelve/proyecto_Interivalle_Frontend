@@ -31,7 +31,7 @@ import { useNotify } from "react-admin";
 import httpClient, { apiUrl } from "../../app/httpClient";
 
 const labelEstado = (estado) =>
-  estado === "TERMINADA" ? "COMPLETADA" : estado;
+  estado === "TERMINADA" ? "COMPLETADA" : String(estado || "").replace(/_/g, " ");
 
 const getEstadoColor = (estado) => {
   switch (estado) {
@@ -115,7 +115,6 @@ const CronogramaVista = () => {
   const esCliente = idRol === 3;
 
     const puedeGestionarSeguimiento = esAdmin || esSupervisor;
-    const puedeVerSeguimiento = esAdmin || esSupervisor || esCliente;
 
   useEffect(() => {
     cargarCronograma();
@@ -436,7 +435,8 @@ const verificarSeguimiento = async (idCronograma) => {
           gridTemplateColumns: {
             xs: "1fr",
             sm: "repeat(2, minmax(180px, 1fr))",
-            md: "repeat(5, 180px)",
+            md: "repeat(5, minmax(150px, 180px))",
+            lg: "repeat(5, minmax(150px, 180px))",
           },
           gap: 2,
           alignItems: "stretch",
@@ -462,7 +462,7 @@ const verificarSeguimiento = async (idCronograma) => {
                 Estado cronograma
               </Typography>
               <Chip
-                label={cronograma.estadoCronograma || "EN_PROCESO"}
+                label={labelEstado(cronograma.estadoCronograma || "EN_PROCESO")}
                 color={
                   getEstadoColor(cronograma.estadoCronograma).chip === "default"
                     ? undefined
@@ -744,6 +744,7 @@ const verificarSeguimiento = async (idCronograma) => {
           </Button>
         </DialogActions>
       </Dialog>
+
     </Box>
   );
 };
