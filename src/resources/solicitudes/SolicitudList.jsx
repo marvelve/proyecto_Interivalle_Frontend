@@ -19,6 +19,33 @@ import { Box, Chip } from "@mui/material";
 import SolicitudVacia from "./SolicitudVacia";
 import { compactDatagridSx, compactListSx } from "../../app/listStyles";
 
+const estadoSolicitudChipSx = {
+  backgroundColor: "#2e7d32",
+  color: "#ffffff",
+  fontWeight: 700,
+  borderRadius: "999px",
+  height: 32,
+  px: 0.5,
+  "& .MuiChip-label": {
+    px: 1.5,
+  },
+};
+
+const estadoPendienteChipSx = {
+  ...estadoSolicitudChipSx,
+  backgroundColor: "#fff3e0",
+  color: "#ef6c00",
+  border: "1px solid #ffcc80",
+};
+
+const EstadoSolicitudChip = ({ estado }) => (
+  <Chip
+    label={estado || "-"}
+    size="small"
+    sx={estado === "PENDIENTE" ? estadoPendienteChipSx : estadoSolicitudChipSx}
+  />
+);
+
 /* ===============================
    BOTÓN CREAR COTIZACIÓN
 ================================= */
@@ -75,6 +102,7 @@ const SolicitudList = () => {
 
   const esAdmin = idRol === "1";
   const esSupervisor = idRol === "2";
+  const esCliente = idRol === "3";
 
   const puedeVerColumnasInternas = esAdmin || esSupervisor;
   const puedeVerTodo = esAdmin || esSupervisor;
@@ -121,29 +149,7 @@ const SolicitudList = () => {
 
         <FunctionField
           label="Estado"
-          render={(record) => {
-            if (record.estado === "PENDIENTE") {
-              return <Chip label="PENDIENTE" color="warning" />;
-            }
-
-            if (record.estado === "GENERADA") {
-              return <Chip label="GENERADA" color="success" />;
-            }
-
-            if (record.estado === "BORRADOR") {
-              return <Chip label="BORRADOR" color="info" />;
-            }
-
-            if (record.estado === "REPROGRAMADA") {
-              return <Chip label="REPROGRAMADA" color="secondary" />;
-            }
-
-            if (record.estado === "CONFIRMADA") {
-              return <Chip label="CONFIRMADA" color="primary" />;
-            }
-
-            return record.estado;
-          }}
+          render={(record) => <EstadoSolicitudChip estado={record?.estado} />}
         />
 
         <DateField source="fechaSolicitud" label="Fecha" />
@@ -199,7 +205,10 @@ const SolicitudList = () => {
 
             if (record?.tipoSolicitud === "VISITA_TECNICA") {
               const puedeReprogramar =
-              record?.estado === "PENDIENTE" || record?.estado === "REPROGRAMADA";
+                (esAdmin || esSupervisor || esCliente) &&
+                (record?.estado === "PENDIENTE" ||
+                  ((esAdmin || esSupervisor) &&
+                    record?.estado === "REPROGRAMADA"));
 
               return (
                 <Box display="flex" gap={1} alignItems="center">

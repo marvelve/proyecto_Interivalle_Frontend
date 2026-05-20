@@ -16,7 +16,6 @@ import {
 } from "@mui/material";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import { useNavigate } from "react-router-dom";
-import { Title } from "react-admin";
 import { apiUrl } from "../../app/httpClient";
 import {
   centeredPageSx,
@@ -24,7 +23,6 @@ import {
   compactTableSx,
   tableHeaderGreen,
 } from "../../app/listStyles";
-import { ClienteProyectoCards } from "../../components/ClienteProyectoCards";
 
 const SeguimientoObraList = () => {
   const navigate = useNavigate();
@@ -121,8 +119,8 @@ const SeguimientoObraList = () => {
   };
 
   return (
+    
     <Box p={3} sx={centeredPageSx}>
-      <Title title="Seguimiento de Obra" />
 
       <Card sx={{ borderRadius: 3, boxShadow: 3 }}>
         <CardContent>
@@ -135,20 +133,6 @@ const SeguimientoObraList = () => {
             <Typography>
               No hay cotizaciones con seguimiento registrado.
             </Typography>
-          ) : esCliente ? (
-            <ClienteProyectoCards
-              records={registros}
-              emptyText="No tienes seguimientos registrados."
-              getProyecto={(record) => record.nombreProyecto}
-              getEstado={(record) => record.estadoCronograma}
-              getFecha={(record) => record.fechaInicio}
-              getFechaLabel={() => "Fecha inicio"}
-              getDetalle={(record) => `Avances registrados: ${record.cantidadAvances || 0}`}
-              onOpen={(record) =>
-                record?.idCronograma &&
-                navigate(`/cronogramas/${record.idCronograma}/seguimiento`)
-              }
-            />
           ) : (
             <TableContainer component={Paper} sx={compactTableContainerSx}>
               <Table size="small" sx={compactTableSx}>

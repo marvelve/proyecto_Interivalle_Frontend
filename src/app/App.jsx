@@ -12,6 +12,7 @@ import CustomAppBar from "../components/CustomAppBar";
 import LandingInterivalle from "../pages/landing_interivalle";
 import LoginPage from "../pages/LoginPage";
 import Register from "../pages/Register";
+import Reportes from "../pages/Reportes";
 import CotizacionBase from "../pages/CotizacionBase";
 import CotizacionPersonalizadaDetalle from "../pages/CotizacionPersonalizadaDetalle";
 import FormulariosCotizacionPersonalizada from "../pages/FormulariosCotizacionPersonalizada";
@@ -112,6 +113,7 @@ const App = () => {
         <Route path="/cronogramas/:idCronograma/seguimiento/:idAvance" element={<AvanceShow />} />
         <Route path="/solicitudes/:idSolicitud/show" element={<SolicitudShow />} />
         <Route path="/seguimiento" element={<SeguimientoObraList />} />
+        <Route path="/reportes" element={<Reportes />} />
       </CustomRoutes>
 
       {(permissions) => [

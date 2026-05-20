@@ -9,12 +9,46 @@ import {
   Typography,
 } from "@mui/material";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import SeguimientoForm from "./seguimientoForm";
+import SeguimientoForm from "./SeguimientoForm";
 import SeguimientoDetalle from "./SeguimientoDetalle";
 import {
   listarAvancesPorCronograma,
   obtenerCronogramaPorId,
-} from "./seguimientoService";
+} from "./SeguimientoService";
+
+const normalizarAvancesPorSemana = (items) => {
+  const avancesPorSemana = new Map();
+
+  (Array.isArray(items) ? items : []).forEach((avance) => {
+    const numeroSemana = Number(avance?.numeroSemana);
+    if (!numeroSemana) return;
+
+    const actual = avancesPorSemana.get(numeroSemana);
+
+    if (!actual) {
+      avancesPorSemana.set(numeroSemana, avance);
+      return;
+    }
+
+    const idOriginal = Math.min(
+      Number(actual.idAvance || Number.MAX_SAFE_INTEGER),
+      Number(avance.idAvance || Number.MAX_SAFE_INTEGER)
+    );
+    const avanceMasCompleto =
+      Number(avance.porcentajeSemana || 0) >= Number(actual.porcentajeSemana || 0)
+        ? avance
+        : actual;
+
+    avancesPorSemana.set(numeroSemana, {
+      ...avanceMasCompleto,
+      idAvance: idOriginal,
+    });
+  });
+
+  return [...avancesPorSemana.values()].sort(
+    (a, b) => Number(a.numeroSemana) - Number(b.numeroSemana)
+  );
+};
 
 const SeguimientoList = () => {
   const { idCronograma } = useParams();
@@ -44,7 +78,7 @@ const SeguimientoList = () => {
 
       setCronogramaInfo(cronograma || null);
       setAvanceSeleccionado(null);
-      setAvances(Array.isArray(data) ? data : []);
+      setAvances(normalizarAvancesPorSemana(data));
     } catch (error) {
       console.error("Error cargando avances:", error);
       alert(error.message || "No se pudieron cargar los avances");
@@ -153,7 +187,10 @@ const SeguimientoList = () => {
         <SeguimientoForm
           idCronograma={idCronograma}
           avanceInicial={avanceEditar}
+          avancesExistentes={avances}
+          totalSemanas={cronogramaInfo?.totalSemanas}
           onGuardado={handleGuardado}
+          onEditarExistente={handleEditar}
           onCancelar={() => {
             setMostrarForm(false);
             setAvanceEditar(null);

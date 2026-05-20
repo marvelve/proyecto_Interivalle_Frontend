@@ -752,7 +752,7 @@ const CotizacionBase = () => {
               <Grid item xs={12} md={4}>
                 <TextField
                   fullWidth
-                  label="Medida mueble alto cocina"
+                  label="Medida Mueble alto cocina (MT)"
                   name="muebleAltoCocina"
                   value={formDataCarpinteria.muebleAltoCocina}
                   onChange={handleChangeCarpinteria}
@@ -764,7 +764,7 @@ const CotizacionBase = () => {
               <Grid item xs={12} md={4}>
                 <TextField
                   fullWidth
-                  label="Medida mueble bajo cocina"
+                  label="Medida Mueble bajo cocina (MT)"
                   name="muebleBajoCocina"
                   value={formDataCarpinteria.muebleBajoCocina}
                   onChange={handleChangeCarpinteria}
@@ -776,7 +776,7 @@ const CotizacionBase = () => {
               <Grid item xs={12} md={4}>
                 <TextField
                   fullWidth
-                  label="Medida mueble barra"
+                  label="Medida Mueble barra (MT)"
                   name="muebleBarra"
                   value={formDataCarpinteria.muebleBarra}
                   onChange={handleChangeCarpinteria}
@@ -788,7 +788,7 @@ const CotizacionBase = () => {
               <Grid item xs={12} md={4}>
                 <TextField
                   fullWidth
-                  label="Cantidad baños"
+                  label="Cantidad Mueble baños"
                   name="cantidadBanos"
                   value={formDataCarpinteria.cantidadBanos}
                   onChange={handleChangeCarpinteria}
@@ -919,7 +919,7 @@ const CotizacionBase = () => {
                       name="tieneNicho"
                     />
                   }
-                  label="¿Tiene nicho?"
+                  label="¿Con Caja de Nicho?"
                 />
               </Box>
             </Box>

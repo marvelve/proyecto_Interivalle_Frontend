@@ -7,6 +7,7 @@ import ReceiptIcon from "@mui/icons-material/Receipt";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import TimelineIcon from "@mui/icons-material/Timeline";
 import PriceChangeIcon from "@mui/icons-material/PriceChange";
+import AssessmentIcon from "@mui/icons-material/Assessment";
 import { useLocation, useNavigate } from "react-router-dom";
 
 const navItems = [
@@ -51,6 +52,12 @@ const navItems = [
     path: "/seguimiento",
     icon: <TimelineIcon fontSize="small" />,
     roles: ["1", "2", "3"],
+  },
+  {
+    label: "Reportes",
+    path: "/reportes",
+    icon: <AssessmentIcon fontSize="small" />,
+    roles: ["1", "2"],
   },
 ];
 

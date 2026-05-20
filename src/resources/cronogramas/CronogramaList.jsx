@@ -5,6 +5,9 @@ import {
   TextField,
   DateField,
   FunctionField,
+  DateInput,
+  SelectInput,
+  TextInput,
   Button,
   TopToolbar,
   useRedirect,
@@ -12,10 +15,30 @@ import {
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import { compactDatagridSx, compactListSx } from "../../app/listStyles";
 import { ClienteProyectoCardsFromList } from "../../components/ClienteProyectoCards";
+import CotizacionVacia from "../cotizaciones/CotizacionVacia";
 
 const CronogramaActions = () => {
   return <TopToolbar />;
 };
+
+const estadoCronogramaChoices = [
+  { id: "EN_PROCESO", name: "EN_PROCESO" },
+  { id: "FINALIZADO", name: "FINALIZADO" },
+];
+
+const cronogramaFilters = [
+  <DateInput key="fechaInicio" label="Fecha inicio" source="fechaInicio" alwaysOn />,
+  <SelectInput
+    key="estadoCronograma"
+    label="Estado"
+    source="estadoCronograma"
+    choices={estadoCronogramaChoices}
+    alwaysOn
+  />,
+  <TextInput key="nombreProyecto" label="Proyecto" source="nombreProyecto" alwaysOn />,
+  <TextInput key="nombreCliente" label="Cliente" source="nombreCliente" alwaysOn />,
+  <DateInput key="fechaFin" label="Fecha fin" source="fechaFin" alwaysOn />,
+];
 
 const CronogramaList = () => {
   const redirect = useRedirect();
@@ -39,6 +62,7 @@ const CronogramaList = () => {
       <List
         title="Cronogramas"
         actions={<CronogramaActions />}
+        empty={<CotizacionVacia />}
         perPage={10}
         sort={{ field: "idCronograma", order: "DESC" }}
         filter={filtros}
@@ -69,6 +93,8 @@ const CronogramaList = () => {
     <List
       title="Cronogramas"
       actions={<CronogramaActions />}
+      filters={puedeVerColumnasInternas ? cronogramaFilters : undefined}
+      empty={<CotizacionVacia />}
       perPage={10}
       sort={{ field: "idCronograma", order: "DESC" }}
       filter={filtros}

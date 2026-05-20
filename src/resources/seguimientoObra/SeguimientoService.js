@@ -76,21 +76,11 @@ export const crearAvance = async (payload) => {
 };
 
 export const actualizarAvance = async (idAvance, payload) => {
-  const response = await fetch(`${apiUrl}/api/avances/${idAvance}`, {
-    method: "PUT",
-    headers: {
-      Authorization: `Bearer ${getToken()}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error.message || "No se pudo actualizar el avance");
+  if (!idAvance) {
+    throw new Error("No se encontró el avance a actualizar");
   }
 
-  return await response.json();
+  return await crearAvance(payload);
 };
 
 export const listarComentarios = async (idAvance) => {

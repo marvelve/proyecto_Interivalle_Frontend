@@ -8,13 +8,29 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { crearAvance, actualizarAvance } from "./seguimientoService";
+import { crearAvance, actualizarAvance } from "./SeguimientoService";
+
+const tieneValor = (valor) => valor !== undefined && valor !== null && valor !== "";
+
+const normalizarNumero = (valor, fallback = 0) => {
+  const numero = Number(valor);
+  return Number.isFinite(numero) ? numero : fallback;
+};
+
+const redondearPorcentaje = (valor) => {
+  const numero = normalizarNumero(valor);
+  const limitado = Math.min(100, Math.max(0, numero));
+  return Math.round(limitado * 100) / 100;
+};
 
 const SeguimientoForm = ({
   idCronograma,
   avanceInicial = null,
+  avancesExistentes = [],
+  totalSemanas,
   onGuardado,
   onCancelar,
+  onEditarExistente,
 }) => {
   const [form, setForm] = useState({
     numeroSemana: "",
@@ -26,6 +42,60 @@ const SeguimientoForm = ({
   });
 
   const [guardando, setGuardando] = useState(false);
+  const totalSemanasCronograma = normalizarNumero(totalSemanas);
+
+  const calcularPorcentajeGeneralSistema = (
+    numeroSemana,
+    porcentajeSemana,
+    porcentajeGeneralActual = ""
+  ) => {
+    const semanaActual = normalizarNumero(numeroSemana);
+
+    if (!semanaActual) {
+      return "";
+    }
+
+    if (
+      totalSemanasCronograma <= 0 &&
+      avanceInicial?.idAvance &&
+      tieneValor(porcentajeGeneralActual)
+    ) {
+      return redondearPorcentaje(porcentajeGeneralActual);
+    }
+
+    const porcentajesPorSemana = new Map();
+
+    (Array.isArray(avancesExistentes) ? avancesExistentes : []).forEach(
+      (avance) => {
+        const semana = normalizarNumero(avance?.numeroSemana);
+
+        if (!semana) {
+          return;
+        }
+
+        const porcentaje = redondearPorcentaje(avance?.porcentajeSemana || 0);
+        const porcentajeActual = porcentajesPorSemana.get(semana) || 0;
+        porcentajesPorSemana.set(semana, Math.max(porcentajeActual, porcentaje));
+      }
+    );
+
+    porcentajesPorSemana.set(
+      semanaActual,
+      redondearPorcentaje(porcentajeSemana || 0)
+    );
+
+    const semanasReferencia =
+      totalSemanasCronograma > 0
+        ? totalSemanasCronograma
+        : Math.max(...porcentajesPorSemana.keys(), semanaActual, 1);
+
+    const sumaPorcentajes = [...porcentajesPorSemana.values()].reduce(
+      (acumulado, porcentaje) => acumulado + Number(porcentaje || 0),
+      0
+    );
+
+    return redondearPorcentaje(sumaPorcentajes / semanasReferencia);
+  };
 
   useEffect(() => {
     setForm({
@@ -33,10 +103,45 @@ const SeguimientoForm = ({
       titulo: avanceInicial?.titulo || "",
       descripcion: avanceInicial?.descripcion || "",
       observaciones: avanceInicial?.observaciones || "",
-      porcentajeSemana: avanceInicial?.porcentajeSemana || "",
-      porcentajeGeneral: avanceInicial?.porcentajeGeneral || "",
+      porcentajeSemana: avanceInicial?.porcentajeSemana ?? "",
+      porcentajeGeneral: avanceInicial?.porcentajeGeneral ?? "",
     });
   }, [avanceInicial]);
+
+  useEffect(() => {
+    const numeroSemana = normalizarNumero(form.numeroSemana);
+
+    if (!numeroSemana) {
+      return;
+    }
+
+    const porcentajeSemana = redondearPorcentaje(form.porcentajeSemana || 0);
+    const porcentajeGeneral = calcularPorcentajeGeneralSistema(
+      numeroSemana,
+      porcentajeSemana,
+      avanceInicial?.porcentajeGeneral
+    );
+
+    setForm((prev) => {
+      if (
+        Number(prev.porcentajeSemana) === Number(porcentajeSemana) &&
+        Number(prev.porcentajeGeneral) === Number(porcentajeGeneral)
+      ) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        porcentajeGeneral,
+      };
+    });
+  }, [
+    form.numeroSemana,
+    form.porcentajeSemana,
+    avanceInicial,
+    avancesExistentes,
+    totalSemanas,
+  ]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -63,12 +168,19 @@ const SeguimientoForm = ({
       return false;
     }
 
-    if (Number(form.porcentajeSemana || 0) < 0 || Number(form.porcentajeSemana || 0) > 100) {
+    const porcentajeSemana = Number(form.porcentajeSemana || 0);
+    const porcentajeGeneral = calcularPorcentajeGeneralSistema(
+      form.numeroSemana,
+      porcentajeSemana,
+      avanceInicial?.porcentajeGeneral
+    );
+
+    if (Number(porcentajeSemana || 0) < 0 || Number(porcentajeSemana || 0) > 100) {
       alert("El porcentaje de semana debe estar entre 0 y 100");
       return false;
     }
 
-    if (Number(form.porcentajeGeneral || 0) < 0 || Number(form.porcentajeGeneral || 0) > 100) {
+    if (Number(porcentajeGeneral || 0) < 0 || Number(porcentajeGeneral || 0) > 100) {
       alert("El porcentaje general debe estar entre 0 y 100");
       return false;
     }
@@ -76,11 +188,45 @@ const SeguimientoForm = ({
     return true;
   };
 
+  const buscarAvanceExistenteSemana = () => {
+    if (avanceInicial?.idAvance) return null;
+
+    return (Array.isArray(avancesExistentes) ? avancesExistentes : []).find(
+      (avance) => Number(avance?.numeroSemana) === Number(form.numeroSemana)
+    );
+  };
+
   const handleSubmit = async () => {
+    if (!form.numeroSemana || Number(form.numeroSemana) <= 0) {
+      alert("La semana es obligatoria");
+      return;
+    }
+
+    const avanceExistente = buscarAvanceExistenteSemana();
+
+    if (avanceExistente) {
+      alert(
+        `La Semana ${form.numeroSemana} ya tiene un avance registrado. Debes editar esa semana para actualizar el porcentaje, la descripción o las observaciones.`
+      );
+
+      if (onEditarExistente) {
+        onEditarExistente(avanceExistente);
+      }
+
+      return;
+    }
+
     if (!validar()) return;
 
     try {
       setGuardando(true);
+
+      const porcentajeSemana = Number(form.porcentajeSemana || 0);
+      const porcentajeGeneral = calcularPorcentajeGeneralSistema(
+        form.numeroSemana,
+        porcentajeSemana,
+        avanceInicial?.porcentajeGeneral
+      );
 
       const payload = {
         idCronograma: Number(idCronograma),
@@ -88,8 +234,8 @@ const SeguimientoForm = ({
         titulo: form.titulo.trim(),
         descripcion: form.descripcion.trim(),
         observaciones: form.observaciones.trim(),
-        porcentajeSemana: Number(form.porcentajeSemana || 0),
-        porcentajeGeneral: Number(form.porcentajeGeneral || 0),
+        porcentajeSemana: Number(porcentajeSemana || 0),
+        porcentajeGeneral: Number(porcentajeGeneral || 0),
       };
 
       let resultado;
@@ -127,6 +273,7 @@ const SeguimientoForm = ({
               type="number"
               value={form.numeroSemana}
               onChange={handleChange}
+              disabled={Boolean(avanceInicial?.idAvance)}
               inputProps={{ min: 1 }}
             />
           </Grid>
@@ -185,6 +332,7 @@ const SeguimientoForm = ({
               type="number"
               value={form.porcentajeGeneral}
               onChange={handleChange}
+              disabled
               inputProps={{ min: 0, max: 100 }}
             />
           </Grid>

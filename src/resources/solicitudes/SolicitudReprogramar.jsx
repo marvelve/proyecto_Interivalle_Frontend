@@ -30,6 +30,12 @@ const SolicitudReprogramar = () => {
   const navigate = useNavigate();
   const notify = useNotify();
 
+  const idRol = String(localStorage.getItem("idRol") || "");
+  const esAdmin = idRol === "1";
+  const esSupervisor = idRol === "2";
+  const esCliente = idRol === "3";
+  const puedeReprogramar = esAdmin || esSupervisor || esCliente;
+
   const [loading, setLoading] = useState(true);
   const [guardando, setGuardando] = useState(false);
 
@@ -86,12 +92,32 @@ const SolicitudReprogramar = () => {
     try {
       setLoading(true);
 
+      if (!puedeReprogramar) {
+        notify("No tiene permisos para reprogramar visitas tecnicas", {
+          type: "warning"
+        });
+        navigate(`/solicitudes/${idSolicitud}/show`);
+        return;
+      }
+
       const { json } = await httpClient(
         `${apiUrl}/api/solicitudes/${idSolicitud}`
       );
 
-      if (json?.estado === "CONFIRMADA" || json?.estado === "REALIZADA") {
-        notify("La visita tecnica ya no se puede reprogramar", {
+      if (json?.tipoSolicitud !== "VISITA_TECNICA") {
+        notify("Solo las visitas tecnicas se pueden reprogramar", {
+          type: "warning"
+        });
+        navigate(`/solicitudes/${idSolicitud}/show`);
+        return;
+      }
+
+      const puedeReprogramarEstado =
+        json?.estado === "PENDIENTE" ||
+        ((esAdmin || esSupervisor) && json?.estado === "REPROGRAMADA");
+
+      if (!puedeReprogramarEstado) {
+        notify("El cliente solo puede reprogramar visitas pendientes", {
           type: "warning"
         });
         navigate(`/solicitudes/${idSolicitud}/show`);
@@ -169,7 +195,7 @@ const SolicitudReprogramar = () => {
         type: "success"
       });
 
-      navigate("/solicitudes");
+      navigate(`/solicitudes/${idSolicitud}/show`);
     } catch (error) {
       console.error(error);
       notify(

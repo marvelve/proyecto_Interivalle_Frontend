@@ -45,10 +45,25 @@ const COLORS = {
 const ASSETS = {
   logo: "/imagenes/landing/Logo_Landing.png",
   hero: "/imagenes/landing/hero-cocina.png",
-  obraBlanca: "/imagenes/landing/obra-blanca.png",
-  carpinteria: "/imagenes/landing/Carpinteria.png",
-  vidrio: "/imagenes/landing/vidrio.png",
-  marmol: "/imagenes/landing/Marmol.png",
+};
+
+const buildServiceImages = (serviceName, total) =>
+  Array.from(
+    { length: total },
+    (_, index) => `/imagenes/servicios/${serviceName}-${index + 1}.jpeg`
+  );
+
+const SERVICE_IMAGES = {
+  obraBlanca: [
+    "/imagenes/servicios/obra-blanca-1.jpeg",
+    "/imagenes/servicios/obra-blanca-2.jpg",
+    "/imagenes/servicios/obra-blanca-3.jpeg",
+    "/imagenes/servicios/obra-blanca-4.jpeg",
+    "/imagenes/servicios/obra-blanca-5.jpeg",
+  ],
+  carpinteria: buildServiceImages("carpinteria", 5),
+  marmol: buildServiceImages("marmol", 5),
+  vidrio: buildServiceImages("vidrio", 5),
 };
 
 const services = [
@@ -56,25 +71,25 @@ const services = [
     title: "Obra Blanca",
     description: "Instalacion, adecuacion y acabados para hogares y negocios.",
     icon: <ConstructionIcon sx={{ fontSize: 34 }} />,
-    image: ASSETS.obraBlanca,
+    images: SERVICE_IMAGES.obraBlanca,
   },
   {
     title: "Carpinteria",
     description: "Diseno e instalacion de muebles, puertas, closets y soluciones en madera.",
     icon: <CarpenterIcon sx={{ fontSize: 34 }} />,
-    image: ASSETS.carpinteria,
+    images: SERVICE_IMAGES.carpinteria,
   },
   {
     title: "Marmol y Granito",
     description: "Fabricacion e instalacion de mesones, lavamanos y superficies decorativas.",
     icon: <DiamondIcon sx={{ fontSize: 34 }} />,
-    image: ASSETS.marmol,
+    images: SERVICE_IMAGES.marmol,
   },
   {
     title: "Divisiones en Vidrio",
     description: "Disenos modernos para banos, oficinas y espacios interiores.",
     icon: <DoorSlidingIcon sx={{ fontSize: 34 }} />,
-    image: ASSETS.vidrio,
+    images: SERVICE_IMAGES.vidrio,
   },
 ];
 
@@ -119,6 +134,37 @@ function defaultNavigate(path) {
 }
 
 function ServiceCard({ service }) {
+  const images = service.images?.length ? service.images : [];
+  const [imageIndex, setImageIndex] = useState(0);
+  const slideshowRef = useRef(null);
+  const currentImage = images[imageIndex] || images[0];
+
+  const stopSlideshow = () => {
+    if (slideshowRef.current) {
+      clearInterval(slideshowRef.current);
+      slideshowRef.current = null;
+    }
+
+    setImageIndex(0);
+  };
+
+  const startSlideshow = () => {
+    if (images.length <= 1 || slideshowRef.current) return;
+
+    setImageIndex((prevIndex) => (prevIndex + 1) % images.length);
+    slideshowRef.current = setInterval(() => {
+      setImageIndex((prevIndex) => (prevIndex + 1) % images.length);
+    }, 1000);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (slideshowRef.current) {
+        clearInterval(slideshowRef.current);
+      }
+    };
+  }, []);
+
   return (
     <Card
       elevation={0}
@@ -131,14 +177,41 @@ function ServiceCard({ service }) {
       }}
     >
       <Box
+        onMouseEnter={startSlideshow}
+        onMouseLeave={stopSlideshow}
+        onFocus={startSlideshow}
+        onBlur={stopSlideshow}
+        tabIndex={0}
         sx={{
           height: { xs: 180, md: 210 },
-          backgroundImage: `url(${service.image})`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
           position: "relative",
+          overflow: "hidden",
+          outline: "none",
+          "&:hover img, &:focus-visible img": {
+            transform: "scale(1.04)",
+          },
+          "&:focus-visible": {
+            boxShadow: `inset 0 0 0 3px ${COLORS.primary}`,
+          },
         }}
       >
+        <Box
+          component="img"
+          src={currentImage}
+          alt={`Servicio de ${service.title}`}
+          loading="lazy"
+          draggable={false}
+          sx={{
+            display: "block",
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            objectPosition: "center",
+            transition: "transform 0.35s ease",
+            userSelect: "none",
+          }}
+        />
+
         <Box
           sx={{
             position: "absolute",

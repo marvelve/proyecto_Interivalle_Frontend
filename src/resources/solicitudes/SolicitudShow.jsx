@@ -8,10 +8,31 @@ import {
   Grid,
   TextField,
   Button,
-  Chip
+  Chip,
+  Tooltip
 } from "@mui/material";
+import EventRepeatIcon from "@mui/icons-material/EventRepeat";
 import { useNotify } from "react-admin";
 import httpClient, { apiUrl } from "../../app/httpClient";
+
+const estadoSolicitudChipSx = {
+  backgroundColor: "#2e7d32",
+  color: "#ffffff",
+  fontWeight: 700,
+  borderRadius: "999px",
+  height: 32,
+  px: 0.5,
+  "& .MuiChip-label": {
+    px: 1.5,
+  },
+};
+
+const estadoPendienteChipSx = {
+  ...estadoSolicitudChipSx,
+  backgroundColor: "#fff3e0",
+  color: "#ef6c00",
+  border: "1px solid #ffcc80",
+};
 
 const SolicitudShow = () => {
   const { idSolicitud } = useParams();
@@ -21,7 +42,9 @@ const SolicitudShow = () => {
   const idRol = String(localStorage.getItem("idRol") || "");
   const esAdmin = idRol === "1";
   const esSupervisor = idRol === "2";
+  const esCliente = idRol === "3";
   const puedeMarcarRealizada = esAdmin || esSupervisor;
+  const puedeGestionarVisita = esAdmin || esSupervisor || esCliente;
 
   const [loading, setLoading] = useState(true);
   const [confirmando, setConfirmando] = useState(false);
@@ -115,33 +138,13 @@ const SolicitudShow = () => {
     }
   };
 
-  const renderEstado = (estado) => {
-    if (estado === "PENDIENTE") {
-      return <Chip label="PENDIENTE" color="warning" />;
-    }
-
-    if (estado === "GENERADA") {
-      return <Chip label="GENERADA" color="success" />;
-    }
-
-    if (estado === "REPROGRAMADA") {
-      return <Chip label="REPROGRAMADA" color="secondary" />;
-    }
-
-    if (estado === "CONFIRMADA") {
-      return <Chip label="CONFIRMADA" color="primary" />;
-    }
-
-    if (estado === "REALIZADA") {
-      return <Chip label="REALIZADA" color="success" />;
-    }
-
-    if (estado === "BORRADOR") {
-      return <Chip label="BORRADOR" color="info" />;
-    }
-
-    return <Chip label={estado || "-"} />;
-  };
+  const renderEstado = (estado) => (
+    <Chip
+      label={estado || "-"}
+      size="small"
+      sx={estado === "PENDIENTE" ? estadoPendienteChipSx : estadoSolicitudChipSx}
+    />
+  );
 
   const renderServicios = () => {
     if (
@@ -181,6 +184,11 @@ const SolicitudShow = () => {
     solicitud?.estado === "CONFIRMADA";
   const puedeConfirmarVisita =
     esVisitaTecnica && esSupervisor && visitaEditable;
+  const puedeReprogramarVisita =
+    esVisitaTecnica &&
+    puedeGestionarVisita &&
+    (solicitud?.estado === "PENDIENTE" ||
+      ((esAdmin || esSupervisor) && solicitud?.estado === "REPROGRAMADA"));
   const puedeMarcarVisitaRealizada =
     esVisitaTecnica && puedeMarcarRealizada && visitaPuedeRealizarse;
 
@@ -304,6 +312,26 @@ const SolicitudShow = () => {
             >
               Volver
             </Button>
+
+            {puedeReprogramarVisita && (
+              <Tooltip title="Reprogramar visita">
+                <Button
+                  variant="contained"
+                  aria-label="Reprogramar visita"
+                  onClick={() => navigate(`/solicitudes/${idSolicitud}/reprogramar`)}
+                  sx={{
+                    minWidth: 42,
+                    width: 42,
+                    height: 42,
+                    padding: 0,
+                    backgroundColor: "#2e7d32",
+                    "&:hover": { backgroundColor: "#1b5e20" }
+                  }}
+                >
+                  <EventRepeatIcon />
+                </Button>
+              </Tooltip>
+            )}
 
             {puedeConfirmarVisita && (
               <Button

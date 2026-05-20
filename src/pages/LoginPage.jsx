@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useLogin, useNotify } from "react-admin";
 import { Link } from "react-router-dom";
+import Visibility from "@mui/icons-material/Visibility";
+import VisibilityOff from "@mui/icons-material/VisibilityOff";
 
 const LOGO_URL = "/imagenes/landing/Logo_Landing.png";
 
@@ -14,6 +16,7 @@ const LoginPage = () => {
   });
 
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (e) => {
     setForm({
@@ -52,15 +55,27 @@ const LoginPage = () => {
             style={styles.input}
           />
 
-          <input
-            type="password"
-            name="password"
-            placeholder="Contraseña"
-            value={form.password}
-            onChange={handleChange}
-            required
-            style={styles.input}
-          />
+          <div style={styles.passwordWrapper}>
+            <input
+              type={showPassword ? "text" : "password"}
+              name="password"
+              placeholder="Contraseña"
+              value={form.password}
+              onChange={handleChange}
+              required
+              style={{ ...styles.input, ...styles.passwordInput }}
+            />
+            <button
+              type="button"
+              aria-label={showPassword ? "Ocultar contrasena" : "Mostrar contrasena"}
+              title={showPassword ? "Ocultar contrasena" : "Mostrar contrasena"}
+              onClick={() => setShowPassword((visible) => !visible)}
+              onMouseDown={(event) => event.preventDefault()}
+              style={styles.passwordToggle}
+            >
+              {showPassword ? <Visibility fontSize="small" /> : <VisibilityOff fontSize="small" />}
+            </button>
+          </div>
 
           <button type="submit" style={styles.button} disabled={loading}>
             {loading ? "Ingresando..." : "Iniciar Sesión"}
@@ -118,6 +133,30 @@ const styles = {
     borderRadius: "8px",
     fontSize: "16px",
     boxSizing: "border-box",
+  },
+  passwordWrapper: {
+    position: "relative",
+    marginBottom: "16px",
+  },
+  passwordInput: {
+    marginBottom: 0,
+    paddingRight: "52px",
+  },
+  passwordToggle: {
+    position: "absolute",
+    top: "50%",
+    right: "12px",
+    transform: "translateY(-50%)",
+    width: "36px",
+    height: "36px",
+    border: "none",
+    background: "transparent",
+    color: "#111827",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "pointer",
+    padding: 0,
   },
   button: {
     width: "100%",

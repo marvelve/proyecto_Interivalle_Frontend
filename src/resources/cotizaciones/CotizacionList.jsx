@@ -3,8 +3,10 @@ import {
   List,
   Datagrid,
   TextField,
-  DateField,
   FunctionField,
+  DateInput,
+  SelectInput,
+  TextInput,
   TopToolbar,
   Button,
   useRedirect,
@@ -14,6 +16,55 @@ import AddIcon from "@mui/icons-material/Add";
 import CotizacionVacia from "./CotizacionVacia";
 import { compactDatagridSx, compactListSx } from "../../app/listStyles";
 import { ClienteProyectoCardsFromList } from "../../components/ClienteProyectoCards";
+
+const estadoCotizacionChoices = [
+  { id: "GENERADA", name: "GENERADA" },
+  { id: "ENVIADA", name: "ENVIADA" },
+  { id: "APROBADA", name: "APROBADA" },
+  { id: "RECHAZADA", name: "RECHAZADA" },
+  { id: "EN_REVISION", name: "EN_REVISION" },
+];
+
+const cotizacionFilters = [
+  <DateInput key="fechaInicio" label="Fecha inicio" source="fechaInicio" alwaysOn />,
+  <SelectInput
+    key="estado"
+    label="Estado"
+    source="estado"
+    choices={estadoCotizacionChoices}
+    alwaysOn
+  />,
+  <TextInput key="nombreProyecto" label="Proyecto" source="nombreProyecto" alwaysOn />,
+  <TextInput key="nombreUsuario" label="Cliente" source="nombreUsuario" alwaysOn />,
+];
+
+const esAprobada = (estado) =>
+  String(estado || "").toUpperCase() === "APROBADA";
+
+const crearFechaLocal = (value) => {
+  if (!value) return null;
+
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+
+  if (match) {
+    return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  }
+
+  const fecha = new Date(value);
+
+  return Number.isNaN(fecha.getTime()) ? null : fecha;
+};
+
+const formatearFecha = (value) => {
+  const fecha = crearFechaLocal(value);
+
+  return fecha ? new Intl.DateTimeFormat("es-CO").format(fecha) : "-";
+};
+
+const obtenerFechaListado = (record) =>
+  esAprobada(record?.estado) && record?.fechaInicio
+    ? record.fechaInicio
+    : record?.fechaCreacion;
 
 const CotizacionActions = () => {
   const redirect = useRedirect();
@@ -86,6 +137,7 @@ const CotizacionList = () => {
     <List
       title="Cotizaciones"
       actions={<CotizacionActions />}
+      filters={puedeVerColumnasInternas ? cotizacionFilters : undefined}
       empty={<CotizacionVacia />}
       perPage={10}
       sort={{ field: "idCotizacion", order: "DESC" }}
@@ -110,7 +162,10 @@ const CotizacionList = () => {
         )}
 
         <TextField source="estado" label="Estado" />
-        <DateField source="fechaCreacion" label="Fecha" showTime={false} />
+        <FunctionField
+          label="Fecha"
+          render={(record) => formatearFecha(obtenerFechaListado(record))}
+        />
 
         <FunctionField
           label="Ver"

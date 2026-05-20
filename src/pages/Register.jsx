@@ -1,5 +1,9 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import Visibility from "@mui/icons-material/Visibility";
+import VisibilityOff from "@mui/icons-material/VisibilityOff";
+
+const LOGO_URL = "/imagenes/landing/Logo_Landing.png";
 
 const Register = () => {
   const navigate = useNavigate();
@@ -14,6 +18,7 @@ const Register = () => {
 
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const validarFormulario = () => {
     const nuevosErrores = {};
@@ -144,6 +149,7 @@ const Register = () => {
   return (
     <div style={styles.container}>
       <div style={styles.card}>
+        <img src={LOGO_URL} alt="Interivalle" style={styles.logo} />
         <h1 style={styles.title}>Registro</h1>
 
         <form onSubmit={registrar}>
@@ -170,14 +176,26 @@ const Register = () => {
             <p style={styles.error}>{errors.correoUsuario}</p>
           )}
 
-          <input
-            name="contrasenaUsuario"
-            type="password"
-            placeholder="Contraseña"
-            value={form.contrasenaUsuario}
-            onChange={handleChange}
-            style={styles.input}
-          />
+          <div style={styles.passwordWrapper}>
+            <input
+              name="contrasenaUsuario"
+              type={showPassword ? "text" : "password"}
+              placeholder="Contraseña"
+              value={form.contrasenaUsuario}
+              onChange={handleChange}
+              style={{ ...styles.input, ...styles.passwordInput }}
+            />
+            <button
+              type="button"
+              aria-label={showPassword ? "Ocultar contrasena" : "Mostrar contrasena"}
+              title={showPassword ? "Ocultar contrasena" : "Mostrar contrasena"}
+              onClick={() => setShowPassword((visible) => !visible)}
+              onMouseDown={(event) => event.preventDefault()}
+              style={styles.passwordToggle}
+            >
+              {showPassword ? <Visibility fontSize="small" /> : <VisibilityOff fontSize="small" />}
+            </button>
+          </div>
           {errors.contrasenaUsuario && (
             <p style={styles.error}>{errors.contrasenaUsuario}</p>
           )}
@@ -238,8 +256,14 @@ const styles = {
     boxShadow: "0 4px 14px rgba(0,0,0,0.1)",
     textAlign: "center",
   },
+  logo: {
+    width: "270px",
+    maxWidth: "100%",
+    height: "auto",
+    marginBottom: "18px",
+  },
   title: {
-    marginBottom: "25px",
+    margin: "0 0 25px",
     fontSize: "32px",
   },
   input: {
@@ -251,6 +275,32 @@ const styles = {
     borderRadius: "8px",
     fontSize: "14px",
     boxSizing: "border-box",
+  },
+  passwordWrapper: {
+    position: "relative",
+    marginTop: "8px",
+    marginBottom: "4px",
+  },
+  passwordInput: {
+    marginTop: 0,
+    marginBottom: 0,
+    paddingRight: "48px",
+  },
+  passwordToggle: {
+    position: "absolute",
+    top: "50%",
+    right: "10px",
+    transform: "translateY(-50%)",
+    width: "34px",
+    height: "34px",
+    border: "none",
+    background: "transparent",
+    color: "#111827",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "pointer",
+    padding: 0,
   },
   error: {
     color: "#d32f2f",

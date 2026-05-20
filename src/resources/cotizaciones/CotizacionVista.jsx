@@ -16,6 +16,7 @@ import {
 } from "@mui/material";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import DownloadIcon from "@mui/icons-material/Download";
 
 import { useNotify } from "react-admin";
 import { useNavigate, useParams } from "react-router-dom";
@@ -197,6 +198,24 @@ const normalizarTexto = (texto) => {
   return (texto || "").toString().trim().toLowerCase();
 };
 
+const normalizarTextoComparacion = (texto) =>
+  (texto || "")
+    .toString()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, " ")
+    .trim();
+
+const palabrasServicioEspecializado = [
+  "CARPINTERIA",
+  "CARPINTER",
+  "VIDRIO",
+  "MESON",
+  "MARMOL",
+  "GRANITO",
+];
+
 const detallesBase = (cotizacion) =>
   cotizacion?.detalleBase || cotizacion?.detalles || [];
 
@@ -235,6 +254,77 @@ const esDetalleVidrio = (item) =>
 
 const esDetalleMezon = (item) =>
   esDetalleServicioProducto(item, [4], ["MESON", "MARMOL", "GRANITO"]);
+
+const obtenerClaveProductoEspecializado = (item) =>
+  normalizarTextoComparacion(
+    item?.descripcion || item?.actividadMaterial || item?.actividad || ""
+  );
+
+const obtenerTextoActividadBase = (actividad) => {
+  const materiales = (actividad?.materiales || [])
+    .map((material) => material?.material)
+    .filter(Boolean)
+    .join(" ");
+
+  return normalizarTextoComparacion(`${actividad?.actividad || ""} ${materiales}`);
+};
+
+const esActividadServicioEspecializado = (
+  actividad,
+  productosEspecializados
+) => {
+  const textoActividad = obtenerTextoActividadBase(actividad);
+
+  if (!textoActividad) return false;
+
+  if (palabrasServicioEspecializado.some((palabra) => textoActividad.includes(palabra))) {
+    return true;
+  }
+
+  return [...productosEspecializados].some(
+    (producto) =>
+      producto &&
+      (textoActividad === producto ||
+        textoActividad.includes(producto) ||
+        producto.includes(textoActividad))
+  );
+};
+
+const calcularTotalesSemanaBase = (actividades = []) => {
+  return actividades.reduce(
+    (totales, actividad) => {
+      const totalActividad = toNumber(actividad?.precioActividad);
+      const totalMateriales = (actividad?.materiales || []).reduce(
+        (acc, material) => acc + toNumber(material?.precioMaterial),
+        0
+      );
+
+      return {
+        totalManoObra: totales.totalManoObra + totalActividad,
+        totalMateriales: totales.totalMateriales + totalMateriales,
+        totalSemana: totales.totalSemana + totalActividad + totalMateriales,
+      };
+    },
+    {
+      totalManoObra: 0,
+      totalMateriales: 0,
+      totalSemana: 0,
+    }
+  );
+};
+
+const recalcularSemanaBase = (semanaObj, actividades) => {
+  const totales = calcularTotalesSemanaBase(actividades);
+
+  return {
+    ...semanaObj,
+    actividades,
+    totalManoObra: totales.totalManoObra,
+    totalMateriales: totales.totalMateriales,
+    totalProductos: 0,
+    totalSemana: totales.totalSemana,
+  };
+};
 
 const formatearCantidadUnidad = (item) => {
   const cantidad = toNumber(item?.cantidad);
@@ -286,6 +376,345 @@ const TablaDetalleProductos = ({ titulo, detalles, total, etiquetaTotal }) => (
     </Box>
   </>
 );
+
+const escapeHtml = (valor) =>
+  (valor ?? "")
+    .toString()
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+
+const renderCeldaPdf = (valor, extra = "") =>
+  `<td ${extra}>${escapeHtml(valor)}</td>`;
+
+const renderTablaBasePdf = (filas) => {
+  const filasHtml =
+    filas.length > 0
+      ? filas
+          .map((fila) => {
+            const celdas = [];
+
+            if (fila.mostrarSemana) {
+              celdas.push(
+                renderCeldaPdf(`Semana ${fila.semana}`, `rowspan="${fila.rowSpanSemana}" class="center strong"`)
+              );
+              celdas.push(
+                renderCeldaPdf(formatearMoneda(fila.totalSemana), `rowspan="${fila.rowSpanSemana}" class="center strong"`)
+              );
+            }
+
+            if (fila.mostrarActividad) {
+              celdas.push(
+                renderCeldaPdf(fila.actividad, `rowspan="${fila.rowSpanActividad}" class="center strong"`)
+              );
+              celdas.push(
+                renderCeldaPdf(formatearMoneda(fila.precioActividad), `rowspan="${fila.rowSpanActividad}" class="center strong"`)
+              );
+            }
+
+            celdas.push(renderCeldaPdf(fila.cantidad !== "" ? formatearNumero(fila.cantidad) : "-"));
+            celdas.push(renderCeldaPdf(fila.material || "-"));
+            celdas.push(
+              renderCeldaPdf(
+                fila.precioMaterial !== null
+                  ? formatearMoneda(fila.precioMaterial)
+                  : "-"
+              )
+            );
+
+            return `<tr>${celdas.join("")}</tr>`;
+          })
+          .join("")
+      : `<tr><td colspan="7">No hay actividades de Obra Blanca registradas.</td></tr>`;
+
+  return `
+    <section>
+      <h2>Detalle de la cotización base</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Semana</th>
+            <th>Valor semana</th>
+            <th>Actividad</th>
+            <th>Valor actividad</th>
+            <th>Cantidad</th>
+            <th>Material</th>
+            <th>Precio material</th>
+          </tr>
+        </thead>
+        <tbody>${filasHtml}</tbody>
+      </table>
+    </section>
+  `;
+};
+
+const renderTablaProductosPdf = (titulo, detalles, total, etiquetaTotal) => {
+  if (!detalles.length) return "";
+
+  const filas = detalles
+    .map(
+      (item) => `
+        <tr>
+          ${renderCeldaPdf(formatearCantidadUnidad(item))}
+          ${renderCeldaPdf(item.descripcion || item.actividadMaterial || "-")}
+          ${renderCeldaPdf(formatearMoneda(item.subtotalVenta))}
+        </tr>
+      `
+    )
+    .join("");
+
+  return `
+    <section>
+      <h2>${escapeHtml(titulo)}</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Cantidad / MT</th>
+            <th>Producto</th>
+            <th>Subtotal</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${filas}
+          <tr class="total-row">
+            <td colspan="2">${escapeHtml(etiquetaTotal)}</td>
+            <td>${escapeHtml(formatearMoneda(total))}</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+  `;
+};
+
+const renderTablaAdicionalesPdf = (titulo, columnas, filas, etiquetaVacia) => {
+  if (!filas.length) return "";
+
+  return `
+    <section>
+      <h3>${escapeHtml(titulo)}</h3>
+      <table>
+        <thead>
+          <tr>${columnas.map((columna) => `<th>${escapeHtml(columna.titulo)}</th>`).join("")}</tr>
+        </thead>
+        <tbody>
+          ${
+            filas.length > 0
+              ? filas
+                  .map(
+                    (fila) => `
+                      <tr>
+                        ${columnas
+                          .map((columna) => renderCeldaPdf(columna.valor(fila)))
+                          .join("")}
+                      </tr>
+                    `
+                  )
+                  .join("")
+              : `<tr><td colspan="${columnas.length}">${escapeHtml(etiquetaVacia)}</td></tr>`
+          }
+        </tbody>
+      </table>
+    </section>
+  `;
+};
+
+const construirHtmlCotizacionPdf = ({
+  cotizacion,
+  medidaAreaPrivada,
+  serviciosSeleccionados,
+  filasBase,
+  detallesCarpinteria,
+  detallesVidrio,
+  detallesMezon,
+  adicionalesObraBlanca,
+  adicionalesCarpinteria,
+  adicionalesVidrio,
+  adicionalesMeson,
+  totales,
+}) => {
+  const servicios = serviciosSeleccionados.length > 0
+    ? serviciosSeleccionados.join(", ")
+    : "-";
+
+  const hayAdicionales =
+    adicionalesObraBlanca.length > 0 ||
+    adicionalesCarpinteria.length > 0 ||
+    adicionalesVidrio.length > 0 ||
+    adicionalesMeson.length > 0;
+
+  const resumen = [
+    ["Total Obra Blanca", totales.totalManoObra],
+    ["Total Materiales", totales.totalMateriales],
+    ["Total Carpintería", totales.totalCarpinteria],
+    ["Total Divisiones en Vidrio", totales.totalVidrio],
+    ["Total Mesones Mármol", totales.totalMezon],
+    ["Total Base", totales.totalBase],
+    ["Total Adicionales", totales.totalAdicionales],
+    ["Total General", totales.totalGeneral],
+  ];
+
+  return `
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Cotización ${escapeHtml(cotizacion.idCotizacion)}</title>
+        <style>
+          @page { size: A4 landscape; margin: 12mm; }
+          * { box-sizing: border-box; }
+          body {
+            color: #111;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 11px;
+            margin: 0;
+          }
+          h1 { font-size: 28px; margin: 0 0 12px; }
+          h2 { font-size: 18px; margin: 24px 0 10px; }
+          h3 { font-size: 15px; margin: 18px 0 8px; }
+          p { margin: 4px 0; }
+          section { break-inside: avoid; page-break-inside: avoid; }
+          table {
+            border-collapse: collapse;
+            margin-top: 8px;
+            width: 100%;
+          }
+          th, td {
+            border: 1px solid #cfcfcf;
+            padding: 7px;
+            text-align: left;
+            vertical-align: top;
+          }
+          th {
+            background: #f3f3f3;
+            font-weight: 700;
+          }
+          .center { text-align: center; vertical-align: middle; }
+          .strong { font-weight: 700; }
+          .meta {
+            display: grid;
+            gap: 6px 20px;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            margin-bottom: 18px;
+          }
+          .meta-full { grid-column: 1 / -1; }
+          .summary {
+            display: grid;
+            gap: 10px;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            margin: 18px 0 22px;
+          }
+          .summary-card {
+            border: 1px solid #d9d9d9;
+            border-radius: 6px;
+            padding: 10px;
+            text-align: center;
+          }
+          .summary-label { font-size: 11px; margin-bottom: 6px; }
+          .summary-value { font-size: 15px; font-weight: 700; }
+          .total-row td { font-weight: 700; }
+          .final-summary {
+            margin-top: 24px;
+            max-width: 420px;
+          }
+          .final-summary td:first-child { font-weight: 700; width: 55%; }
+          @media print {
+            body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+          }
+        </style>
+      </head>
+      <body>
+        <h1>Cotización #${escapeHtml(cotizacion.idCotizacion)}</h1>
+        <div class="meta">
+          <p><strong>Proyecto:</strong> ${escapeHtml(cotizacion.nombreProyecto || "-")}</p>
+          <p><strong>Área privada:</strong> ${escapeHtml(formatearAreaPrivada(medidaAreaPrivada))}</p>
+          <p><strong>Estado:</strong> ${escapeHtml(cotizacion.estado || "-")}</p>
+          <p class="meta-full"><strong>Servicios seleccionados:</strong> ${escapeHtml(servicios)}</p>
+        </div>
+
+        <div class="summary">
+          ${resumen
+            .map(
+              ([label, value]) => `
+                <div class="summary-card">
+                  <div class="summary-label">${escapeHtml(label)}</div>
+                  <div class="summary-value">${escapeHtml(formatearMoneda(value))}</div>
+                </div>
+              `
+            )
+            .join("")}
+        </div>
+
+        ${renderTablaBasePdf(filasBase)}
+        ${renderTablaProductosPdf("Detalle Carpintería", detallesCarpinteria, totales.totalCarpinteria, "Total Carpintería")}
+        ${renderTablaProductosPdf("Detalle Divisiones en Vidrio", detallesVidrio, totales.totalVidrio, "Total Divisiones en Vidrio")}
+        ${renderTablaProductosPdf("Detalle Mesones en Mármol", detallesMezon, totales.totalMezon, "Total Mesones en Mármol")}
+
+        <section>
+          <h2>Actividades adicionales</h2>
+          ${
+            hayAdicionales
+              ? `
+                ${renderTablaAdicionalesPdf("Mano de Obra / Obra Blanca", [
+                  { titulo: "Actividad", valor: (item) => item.actividad || "-" },
+                  { titulo: "Lugar", valor: (item) => item.lugar || "-" },
+                  { titulo: "Unidad", valor: (item) => item.unidad || "-" },
+                  { titulo: "Cantidad", valor: (item) => item.cantidad ?? "-" },
+                  { titulo: "Medida", valor: (item) => formatearNumero(item.medida) },
+                  { titulo: "Precio Unitario", valor: (item) => formatearMoneda(item.precioUnitario) },
+                  { titulo: "Subtotal", valor: (item) => formatearMoneda(item.subtotal) },
+                  { titulo: "Descripción", valor: (item) => item.descripcion || "-" },
+                ], adicionalesObraBlanca, "No hay actividades adicionales de Obra Blanca.")}
+                ${renderTablaAdicionalesPdf("Carpintería adicional", [
+                  { titulo: "Tipo mueble", valor: (item) => item.tipoMueble || "-" },
+                  { titulo: "Material / Lugar", valor: (item) => item.material || "-" },
+                  { titulo: "Cantidad", valor: (item) => item.cantidad ?? "-" },
+                  { titulo: "Largo", valor: (item) => formatearNumero(item.largo) },
+                  { titulo: "Ancho", valor: (item) => formatearNumero(item.ancho) },
+                  { titulo: "Alto", valor: (item) => formatearNumero(item.alto) },
+                  { titulo: "Precio Unitario", valor: (item) => formatearMoneda(item.precioUnitario) },
+                  { titulo: "Subtotal", valor: (item) => formatearMoneda(item.subtotal) },
+                  { titulo: "Descripción", valor: (item) => item.descripcion || "-" },
+                ], adicionalesCarpinteria, "No hay carpintería adicional.")}
+                ${renderTablaAdicionalesPdf("Vidrio adicional", [
+                  { titulo: "Tipo vidrio", valor: (item) => item.tipoVidrio || "-" },
+                  { titulo: "Cantidad", valor: (item) => item.cantidad ?? "-" },
+                  { titulo: "Precio Unitario", valor: (item) => formatearMoneda(item.precioUnitario) },
+                  { titulo: "Subtotal", valor: (item) => formatearMoneda(item.subtotal) },
+                  { titulo: "Descripción", valor: (item) => item.descripcion || "-" },
+                ], adicionalesVidrio, "No hay vidrio adicional.")}
+                ${renderTablaAdicionalesPdf("Mesón granito adicional", [
+                  { titulo: "Tipo granito", valor: (item) => item.tipoGranito || "-" },
+                  { titulo: "Cantidad", valor: (item) => item.cantidad ?? "-" },
+                  { titulo: "Precio Unitario", valor: (item) => formatearMoneda(item.precioUnitario) },
+                  { titulo: "Subtotal", valor: (item) => formatearMoneda(item.subtotal) },
+                  { titulo: "Descripción", valor: (item) => item.descripcion || "-" },
+                ], adicionalesMeson, "No hay mesón granito adicional.")}
+              `
+              : "<p>No hay actividades adicionales registradas.</p>"
+          }
+        </section>
+
+        <section>
+          <h2>Resumen final</h2>
+          <table class="final-summary">
+            <tbody>
+              <tr><td>Total mano de obra</td><td>${escapeHtml(formatearMoneda(totales.totalManoObra))}</td></tr>
+              <tr><td>Total materiales</td><td>${escapeHtml(formatearMoneda(totales.totalMateriales))}</td></tr>
+              <tr><td>Total carpintería</td><td>${escapeHtml(formatearMoneda(totales.totalCarpinteria))}</td></tr>
+              <tr><td>Total divisiones en vidrio</td><td>${escapeHtml(formatearMoneda(totales.totalVidrio))}</td></tr>
+              <tr><td>Total mesones mármol</td><td>${escapeHtml(formatearMoneda(totales.totalMezon))}</td></tr>
+              <tr><td>Total cotización base</td><td>${escapeHtml(formatearMoneda(totales.totalBase))}</td></tr>
+              <tr><td>Total adicionales</td><td>${escapeHtml(formatearMoneda(totales.totalAdicionales))}</td></tr>
+              <tr class="total-row"><td>Total general</td><td>${escapeHtml(formatearMoneda(totales.totalGeneral))}</td></tr>
+            </tbody>
+          </table>
+        </section>
+      </body>
+    </html>
+  `;
+};
 
 const construirFilasConRowSpan = (semanas = []) => {
   const filas = [];
@@ -624,9 +1053,43 @@ const CotizacionVista = () => {
   const adicionalesVidrio = personalizada?.vidrio || [];
   const adicionalesMeson = personalizada?.mesonGranito || [];
 
+  const detalles = useMemo(() => detallesBase(cotizacion), [cotizacion]);
+
+  const detallesCarpinteria = useMemo(() => {
+    return detalles.filter(esDetalleCarpinteria);
+  }, [detalles]);
+
+  const detallesVidrio = useMemo(() => {
+    return detalles.filter(esDetalleVidrio);
+  }, [detalles]);
+
+  const detallesMezon = useMemo(() => {
+    return detalles.filter(esDetalleMezon);
+  }, [detalles]);
+
+  const productosEspecializadosBase = useMemo(() => {
+    return new Set(
+      [...detallesCarpinteria, ...detallesVidrio, ...detallesMezon]
+        .map(obtenerClaveProductoEspecializado)
+        .filter(Boolean)
+    );
+  }, [detallesCarpinteria, detallesVidrio, detallesMezon]);
+
   const semanasBase = useMemo(() => {
-    return cotizacion?.semanas || [];
-  }, [cotizacion]);
+    return (cotizacion?.semanas || [])
+      .map((semanaObj) => {
+        const actividades = (semanaObj?.actividades || []).filter(
+          (actividad) =>
+            !esActividadServicioEspecializado(
+              actividad,
+              productosEspecializadosBase
+            )
+        );
+
+        return recalcularSemanaBase(semanaObj, actividades);
+      })
+      .filter((semanaObj) => (semanaObj?.actividades || []).length > 0);
+  }, [cotizacion, productosEspecializadosBase]);
 
   const semanasDisponibles = useMemo(() => {
     const semanas = semanasBase
@@ -687,8 +1150,6 @@ const CotizacionVista = () => {
     return construirFilasConRowSpan(semanasFiltradas);
   }, [semanasFiltradas]);
 
-  const detalles = useMemo(() => detallesBase(cotizacion), [cotizacion]);
-
   const medidaAreaPrivada = useMemo(() => {
     return obtenerMedidaAreaPrivada(cotizacion);
   }, [cotizacion]);
@@ -696,18 +1157,6 @@ const CotizacionVista = () => {
   const serviciosSeleccionados = useMemo(() => {
     return obtenerServiciosSeleccionados(cotizacion, detalles);
   }, [cotizacion, detalles]);
-
-  const detallesCarpinteria = useMemo(() => {
-    return detalles.filter(esDetalleCarpinteria);
-  }, [detalles]);
-
-  const detallesVidrio = useMemo(() => {
-    return detalles.filter(esDetalleVidrio);
-  }, [detalles]);
-
-  const detallesMezon = useMemo(() => {
-    return detalles.filter(esDetalleMezon);
-  }, [detalles]);
 
   const totalCarpinteria = useMemo(() => {
     return detallesCarpinteria.reduce(
@@ -849,6 +1298,50 @@ const CotizacionVista = () => {
     }
 
     navigate(`/cronogramas/${cronograma.idCronograma}/seguimiento`);
+  };
+
+  const descargarPdf = () => {
+    const ventanaPdf = window.open("", "_blank");
+
+    if (!ventanaPdf) {
+      notify("No se pudo abrir la ventana de descarga. Revisa el bloqueador de ventanas emergentes.", {
+        type: "warning",
+      });
+      return;
+    }
+
+    const html = construirHtmlCotizacionPdf({
+      cotizacion,
+      medidaAreaPrivada,
+      serviciosSeleccionados,
+      filasBase: construirFilasConRowSpan(semanasBase),
+      detallesCarpinteria,
+      detallesVidrio,
+      detallesMezon,
+      adicionalesObraBlanca,
+      adicionalesCarpinteria,
+      adicionalesVidrio,
+      adicionalesMeson,
+      totales: {
+        totalManoObra: toNumber(cotizacion?.totalManoObra),
+        totalMateriales: toNumber(cotizacion?.totalMateriales),
+        totalCarpinteria,
+        totalVidrio,
+        totalMezon,
+        totalBase: totalBaseMostrar,
+        totalAdicionales: totalAdicionalesMostrar,
+        totalGeneral: totalGeneralMostrar,
+      },
+    });
+
+    ventanaPdf.document.open();
+    ventanaPdf.document.write(html);
+    ventanaPdf.document.close();
+    ventanaPdf.focus();
+
+    setTimeout(() => {
+      ventanaPdf.print();
+    }, 400);
   };
 
   if (loading) {
@@ -1013,6 +1506,15 @@ const CotizacionVista = () => {
           >
             {consultandoCronograma ? "CARGANDO..." : "VER SEGUIMIENTO"}
           </Button>
+
+          <Button
+            variant="outlined"
+            color="success"
+            startIcon={<DownloadIcon />}
+            onClick={descargarPdf}
+          >
+            DESCARGAR PDF
+          </Button>
         </Box>
 
         <Typography variant="h5" fontWeight="bold" mb={2} mt={4}>
@@ -1161,7 +1663,7 @@ const CotizacionVista = () => {
               ) : (
                 <tr>
                   <td style={estilos.td} colSpan="7">
-                    No hay datos para los filtros seleccionados.
+                    No hay actividades de Obra Blanca para los filtros seleccionados.
                   </td>
                 </tr>
               )}

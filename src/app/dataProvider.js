@@ -75,6 +75,142 @@ const applySortAndPagination = (json, params = {}, resource) => {
   };
 };
 
+const normalizarTexto = (value) =>
+  String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
+const fechaSoloDia = (value) => {
+  if (!value) return "";
+
+  const texto = String(value);
+  const isoDate = texto.match(/^(\d{4}-\d{2}-\d{2})/);
+
+  if (isoDate) {
+    return isoDate[1];
+  }
+
+  const fecha = new Date(value);
+
+  if (Number.isNaN(fecha.getTime())) {
+    return "";
+  }
+
+  const year = fecha.getFullYear();
+  const month = String(fecha.getMonth() + 1).padStart(2, "0");
+  const day = String(fecha.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
+const esCotizacionAprobada = (estado) =>
+  normalizarTexto(estado) === "aprobada";
+
+const enriquecerCotizacionesConCronogramas = (cotizaciones, cronogramas) => {
+  const fechaInicioPorCotizacion = new Map(
+    (Array.isArray(cronogramas) ? cronogramas : [])
+      .filter((cronograma) => cronograma?.idCotizacion && cronograma?.fechaInicio)
+      .map((cronograma) => [
+        Number(cronograma.idCotizacion),
+        cronograma.fechaInicio,
+      ])
+  );
+
+  return (Array.isArray(cotizaciones) ? cotizaciones : []).map((cotizacion) => ({
+    ...cotizacion,
+    fechaInicio:
+      cotizacion.fechaInicio ||
+      fechaInicioPorCotizacion.get(Number(cotizacion.idCotizacion)) ||
+      null,
+  }));
+};
+
+const filtrarCotizaciones = (json, filtros = {}) => {
+  let data = mapIdField(Array.isArray(json) ? json : []);
+  const {
+    fechaInicio,
+    estado,
+    nombreProyecto,
+    nombreUsuario,
+  } = filtros;
+
+  if (fechaInicio) {
+    const fechaFiltro = fechaSoloDia(fechaInicio);
+    data = data.filter(
+      (item) =>
+        esCotizacionAprobada(item.estado) &&
+        fechaSoloDia(item.fechaInicio) === fechaFiltro
+    );
+  }
+
+  if (estado) {
+    const estadoFiltro = normalizarTexto(estado);
+    data = data.filter((item) => normalizarTexto(item.estado) === estadoFiltro);
+  }
+
+  if (nombreProyecto) {
+    const proyectoFiltro = normalizarTexto(nombreProyecto);
+    data = data.filter((item) =>
+      normalizarTexto(item.nombreProyecto).includes(proyectoFiltro)
+    );
+  }
+
+  if (nombreUsuario) {
+    const clienteFiltro = normalizarTexto(nombreUsuario);
+    data = data.filter((item) =>
+      normalizarTexto(item.nombreUsuario).includes(clienteFiltro)
+    );
+  }
+
+  return data;
+};
+
+const filtrarCronogramas = (json, filtros = {}) => {
+  let data = mapIdField(Array.isArray(json) ? json : []);
+  const {
+    fechaInicio,
+    estadoCronograma,
+    nombreProyecto,
+    nombreCliente,
+    fechaFin,
+  } = filtros;
+
+  if (fechaInicio) {
+    const fechaFiltro = fechaSoloDia(fechaInicio);
+    data = data.filter((item) => fechaSoloDia(item.fechaInicio) === fechaFiltro);
+  }
+
+  if (estadoCronograma) {
+    const estadoFiltro = normalizarTexto(estadoCronograma);
+    data = data.filter(
+      (item) => normalizarTexto(item.estadoCronograma) === estadoFiltro
+    );
+  }
+
+  if (nombreProyecto) {
+    const proyectoFiltro = normalizarTexto(nombreProyecto);
+    data = data.filter((item) =>
+      normalizarTexto(item.nombreProyecto).includes(proyectoFiltro)
+    );
+  }
+
+  if (nombreCliente) {
+    const clienteFiltro = normalizarTexto(nombreCliente);
+    data = data.filter((item) =>
+      normalizarTexto(item.nombreCliente).includes(clienteFiltro)
+    );
+  }
+
+  if (fechaFin) {
+    const fechaFiltro = fechaSoloDia(fechaFin);
+    data = data.filter((item) => fechaSoloDia(item.fechaFin) === fechaFiltro);
+  }
+
+  return data;
+};
+
 const dataProvider = {
   ...baseDataProvider,
 
@@ -113,14 +249,30 @@ getList: async (resource, params) => {
     }
 
     const { json } = await httpClient(url);
+    let cotizaciones = json;
 
-    return applySortAndPagination(json, params, resource);
+    if (idRol === 1 || idRol === 2) {
+      try {
+        const { json: cronogramas } = await httpClient(
+          `${apiUrl}/api/cliente/cronogramas`
+        );
+
+        cotizaciones = enriquecerCotizacionesConCronogramas(json, cronogramas);
+      } catch (error) {
+        console.error("Error cargando fechas de inicio de cronogramas:", error);
+      }
+    }
+
+    const data = filtrarCotizaciones(cotizaciones, params.filter);
+
+    return applySortAndPagination(data, params, resource);
   }
 
    if (resource === "cronogramas") {
       const { json } = await httpClient(`${apiUrl}/api/cliente/cronogramas`);
+      const data = filtrarCronogramas(json, params.filter);
 
-      return applySortAndPagination(json, params, resource);
+      return applySortAndPagination(data, params, resource);
     }
 
     if (resource === "catalogo-items") {
