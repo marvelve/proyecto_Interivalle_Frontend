@@ -1,13 +1,13 @@
 import React, { useMemo, useState } from "react";
 import {
   Box,
+  Button,
   Card,
   CardContent,
   Grid,
+  MenuItem,
   TextField,
   Typography,
-  Button,
-  MenuItem,
 } from "@mui/material";
 
 const crearActividadVacia = () => ({
@@ -22,6 +22,14 @@ const crearActividadVacia = () => ({
   subtotal: 0,
 });
 
+const DECIMAL_INPUT_PROPS = {
+  inputMode: "decimal",
+  pattern: "[0-9]*[.,]?[0-9]*",
+};
+
+const normalizarDecimal = (valor) =>
+  String(valor ?? "").trim().replace(",", ".");
+
 const FormObraBlanca = ({
   actividadesCatalogo = [],
   value = [],
@@ -32,7 +40,7 @@ const FormObraBlanca = ({
 }) => {
   const [touched, setTouched] = useState({});
   const [intentoAgregar, setIntentoAgregar] = useState(false);
-  const [intentoGuardar, setIntentoGuardar] = useState(false);
+  const [intentoGuardar] = useState(false);
 
   const actividades = useMemo(() => {
     return Array.isArray(value) && value.length > 0
@@ -40,15 +48,10 @@ const FormObraBlanca = ({
       : [crearActividadVacia()];
   }, [value]);
 
-  const actualizarActividades = (nuevasActividades) => {
-    if (onChange) {
-      onChange(nuevasActividades);
-    }
-  };
-
   const catalogoNormalizado = useMemo(() => {
     if (!Array.isArray(actividadesCatalogo)) return [];
 
+    // Normaliza nombres de campos porque el catalogo puede venir con llaves distintas.
     return actividadesCatalogo
       .filter((act) => act?.estado !== false)
       .map((act) => {
@@ -65,11 +68,16 @@ const FormObraBlanca = ({
             precioUnitario === "" ||
             precioUnitario === null ||
             precioUnitario === undefined,
-          descripcion:
-            act.descripcion ?? act.nombreActividad ?? act.nombre ?? "",
+          descripcion: act.descripcion ?? act.nombreActividad ?? act.nombre ?? "",
         };
       });
   }, [actividadesCatalogo]);
+
+  const actualizarActividades = (nuevasActividades) => {
+    if (onChange) {
+      onChange(nuevasActividades);
+    }
+  };
 
   const marcarTouched = (index, campo) => {
     setTouched((prev) => ({
@@ -88,8 +96,12 @@ const FormObraBlanca = ({
   const esVacio = (valor) =>
     valor === null || valor === undefined || valor === "";
 
-  const esNumeroValido = (valor) =>
-    !esVacio(valor) && !isNaN(Number(valor)) && Number(valor) > 0;
+  const toNumero = (valor) => {
+    const numero = Number(normalizarDecimal(valor));
+    return Number.isFinite(numero) ? numero : 0;
+  };
+
+  const esNumeroValido = (valor) => !esVacio(valor) && toNumero(valor) > 0;
 
   const esTipoMetro = (tipoCobro = "") =>
     tipoCobro.toUpperCase().includes("METRO CUADRADO");
@@ -106,15 +118,7 @@ const FormObraBlanca = ({
 
   const getHelperActividad = (item, index) => {
     if (errors?.[index]?.idActividad) return errors[index].idActividad;
-    return getErrorActividad(item, index)
-      ? "La actividad es obligatoria"
-      : " ";
-  };
-
-  const getErrorCantidad = (item, index) => {
-    if (esTipoMetro(item.tipoCobro)) return false;
-    if (!debeMostrarError(index, "cantidad")) return false;
-    return !esNumeroValido(item.cantidad);
+    return getErrorActividad(item, index) ? "La actividad es obligatoria" : " ";
   };
 
   const getErrorLugar = (item, index) => {
@@ -126,6 +130,12 @@ const FormObraBlanca = ({
   const getHelperLugar = (item, index) => {
     if (errors?.[index]?.lugar) return errors[index].lugar;
     return getErrorLugar(item, index) ? "El lugar es obligatorio" : " ";
+  };
+
+  const getErrorCantidad = (item, index) => {
+    if (esTipoMetro(item.tipoCobro)) return false;
+    if (!debeMostrarError(index, "cantidad")) return false;
+    return !esNumeroValido(item.cantidad);
   };
 
   const getErrorMedida = (item, index) => {
@@ -143,11 +153,11 @@ const FormObraBlanca = ({
       item.cantidad !== "" ||
       item.medida !== "" ||
       item.descripcion?.trim() ||
-      Number(item.subtotal) > 0;
+      toNumero(item.subtotal) > 0;
 
     if (!filaTieneAlgo) return false;
 
-    return Number(item.subtotal) <= 0;
+    return toNumero(item.subtotal) <= 0;
   };
 
   const getHelperSubtotal = (item, index) => {
@@ -162,24 +172,25 @@ const FormObraBlanca = ({
     if (!item.lugar || !item.lugar.trim()) return false;
 
     if (esTipoMetro(item.tipoCobro)) {
-      return esNumeroValido(item.medida) && Number(item.subtotal) > 0;
+      return esNumeroValido(item.medida) && toNumero(item.subtotal) > 0;
     }
 
     if (esTipoUnidad(item.tipoCobro)) {
-      return esNumeroValido(item.cantidad) && Number(item.subtotal) > 0;
+      return esNumeroValido(item.cantidad) && toNumero(item.subtotal) > 0;
     }
 
     return (
       esNumeroValido(item.cantidad) &&
       esNumeroValido(item.medida) &&
-      Number(item.subtotal) > 0
+      toNumero(item.subtotal) > 0
     );
   };
 
   const recalcularSubtotal = (actividadActualizada) => {
-    const cantidad = Number(actividadActualizada.cantidad || 0);
-    const medida = Number(actividadActualizada.medida || 0);
-    const precioUnitario = Number(actividadActualizada.precioUnitario || 0);
+    // El subtotal de la fila depende del tipo de cobro elegido en el catalogo.
+    const cantidad = toNumero(actividadActualizada.cantidad);
+    const medida = toNumero(actividadActualizada.medida);
+    const precioUnitario = toNumero(actividadActualizada.precioUnitario);
     const tipoCobro = (actividadActualizada.tipoCobro || "").toUpperCase();
 
     let subtotal = 0;
@@ -204,6 +215,7 @@ const FormObraBlanca = ({
       ...nuevas[index],
       [campo]: valor,
     });
+
     actualizarActividades(nuevas);
   };
 
@@ -276,7 +288,7 @@ const FormObraBlanca = ({
 
   const totalGeneral = useMemo(() => {
     return actividades.reduce(
-      (acc, item) => acc + Number(item.subtotal || 0),
+      (acc, item) => acc + toNumero(item.subtotal),
       0
     );
   }, [actividades]);
@@ -291,170 +303,174 @@ const FormObraBlanca = ({
         const filaDeshabilitada = disabled || item.yaGuardada;
 
         return (
-        <Card
-          key={index}
-          sx={{
-            mb: 3,
-            borderRadius: 3,
-            boxShadow: 2,
-          }}
-        >
-          <CardContent sx={{ p: 4 }}>
-            <Typography variant="h5" sx={{ mb: 3 }}>
-              Actividad {index + 1}
-            </Typography>
+          <Card
+            key={index}
+            sx={{
+              mb: 3,
+              borderRadius: 3,
+              boxShadow: 2,
+            }}
+          >
+            <CardContent sx={{ p: 4 }}>
+              <Typography variant="h5" sx={{ mb: 3 }}>
+                Actividad {index + 1}
+              </Typography>
 
-            <Grid container spacing={2}>
-              <Grid item xs={12} md={5}>
-                <TextField
-                  select
-                  fullWidth
-                  required
-                  label="Actividad"
-                  value={item.idActividad ?? ""}
-                  onChange={(e) => handleSeleccionActividad(index, e.target.value)}
-                  onBlur={() => marcarTouched(index, "idActividad")}
-                  disabled={filaDeshabilitada}
-                  error={getErrorActividad(item, index)}
-                  helperText={getHelperActividad(item, index)}
-                  InputLabelProps={{ shrink: true }}
-                  SelectProps={{ displayEmpty: true }}
-                  sx={{ minWidth: 280 }}
-                >
-                  {catalogoNormalizado.map((act) => (
-                    <MenuItem key={act.idActividad} value={act.idActividad}>
-                      {act.nombreActividad}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              </Grid>
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={5}>
+                  <TextField
+                    select
+                    fullWidth
+                    required
+                    label="Actividad"
+                    value={item.idActividad ?? ""}
+                    onChange={(e) =>
+                      handleSeleccionActividad(index, e.target.value)
+                    }
+                    onBlur={() => marcarTouched(index, "idActividad")}
+                    disabled={filaDeshabilitada}
+                    error={getErrorActividad(item, index)}
+                    helperText={getHelperActividad(item, index)}
+                    InputLabelProps={{ shrink: true }}
+                    SelectProps={{ displayEmpty: true }}
+                    sx={{ minWidth: 280 }}
+                  >
+                    {catalogoNormalizado.map((act) => (
+                      <MenuItem key={act.idActividad} value={act.idActividad}>
+                        {act.nombreActividad}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Grid>
 
-              <Grid item xs={12} md={3}>
-                <TextField
-                  fullWidth
-                  label="Lugar"
-                  value={item.lugar ?? ""}
-                  onChange={(e) => handleChange(index, "lugar", e.target.value)}
-                  onBlur={() => marcarTouched(index, "lugar")}
-                  disabled={filaDeshabilitada}
-                  error={getErrorLugar(item, index)}
-                  helperText={getHelperLugar(item, index)}
-                  InputLabelProps={{ shrink: true }}
-                />
-              </Grid>
+                <Grid item xs={12} md={3}>
+                  <TextField
+                    fullWidth
+                    label="Lugar"
+                    value={item.lugar ?? ""}
+                    onChange={(e) => handleChange(index, "lugar", e.target.value)}
+                    onBlur={() => marcarTouched(index, "lugar")}
+                    disabled={filaDeshabilitada}
+                    error={getErrorLugar(item, index)}
+                    helperText={getHelperLugar(item, index)}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
 
-              <Grid item xs={12} md={2}>
-                <TextField
-                  fullWidth
-                  required={!esTipoMetro(item.tipoCobro)}
-                  disabled={filaDeshabilitada || esTipoMetro(item.tipoCobro)}
-                  label="Cantidad"
-                  type="number"
-                  value={item.cantidad ?? ""}
-                  onChange={(e) => handleChange(index, "cantidad", e.target.value)}
-                  onBlur={() => marcarTouched(index, "cantidad")}
-                  error={getErrorCantidad(item, index)}
-                  helperText={
-                    esTipoMetro(item.tipoCobro)
-                      ? "No aplica para metro cuadrado"
-                      : getErrorCantidad(item, index)
-                      ? "La cantidad es obligatoria"
-                      : " "
-                  }
-                  inputProps={{ min: 1 }}
-                  InputLabelProps={{ shrink: true }}
-                />
-              </Grid>
+                <Grid item xs={12} md={2}>
+                  <TextField
+                    fullWidth
+                    required={!esTipoMetro(item.tipoCobro)}
+                    disabled={filaDeshabilitada || esTipoMetro(item.tipoCobro)}
+                    label="Cantidad"
+                    type="text"
+                    value={item.cantidad ?? ""}
+                    onChange={(e) =>
+                      handleChange(index, "cantidad", e.target.value)
+                    }
+                    onBlur={() => marcarTouched(index, "cantidad")}
+                    error={getErrorCantidad(item, index)}
+                    helperText={
+                      esTipoMetro(item.tipoCobro)
+                        ? "No aplica para metro cuadrado"
+                        : getErrorCantidad(item, index)
+                        ? "La cantidad es obligatoria"
+                        : " "
+                    }
+                    inputProps={DECIMAL_INPUT_PROPS}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
 
-              <Grid item xs={12} md={2}>
-                <TextField
-                  fullWidth
-                  required={!esTipoUnidad(item.tipoCobro)}
-                  disabled={filaDeshabilitada || esTipoUnidad(item.tipoCobro)}
-                  label="Medida (m²)"
-                  type="number"
-                  value={item.medida ?? ""}
-                  onChange={(e) => handleChange(index, "medida", e.target.value)}
-                  onBlur={() => marcarTouched(index, "medida")}
-                  error={getErrorMedida(item, index)}
-                  helperText={
-                    esTipoUnidad(item.tipoCobro)
-                      ? "No aplica para unidad"
-                      : getErrorMedida(item, index)
-                      ? "La medida es obligatoria"
-                      : " "
-                  }
-                  inputProps={{ min: 0.01, step: "any" }}
-                  InputLabelProps={{ shrink: true }}
-                />
-              </Grid>
+                <Grid item xs={12} md={2}>
+                  <TextField
+                    fullWidth
+                    required={!esTipoUnidad(item.tipoCobro)}
+                    disabled={filaDeshabilitada || esTipoUnidad(item.tipoCobro)}
+                    label="Medida (m2)"
+                    type="text"
+                    value={item.medida ?? ""}
+                    onChange={(e) => handleChange(index, "medida", e.target.value)}
+                    onBlur={() => marcarTouched(index, "medida")}
+                    error={getErrorMedida(item, index)}
+                    helperText={
+                      esTipoUnidad(item.tipoCobro)
+                        ? "No aplica para unidad"
+                        : getErrorMedida(item, index)
+                        ? "La medida es obligatoria"
+                        : " "
+                    }
+                    inputProps={DECIMAL_INPUT_PROPS}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
 
-              <Grid item xs={12} md={3}>
-                <TextField
-                  fullWidth
-                  label="Tipo de cobro"
-                  value={item.tipoCobro ?? ""}
-                  disabled={filaDeshabilitada}
-                  InputProps={{ readOnly: true }}
-                  InputLabelProps={{ shrink: true }}
-                />
-              </Grid>
+                <Grid item xs={12} md={3}>
+                  <TextField
+                    fullWidth
+                    label="Tipo de cobro"
+                    value={item.tipoCobro ?? ""}
+                    disabled={filaDeshabilitada}
+                    InputProps={{ readOnly: true }}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
 
-              <Grid item xs={12} md={3}>
-                <TextField
-                  fullWidth
-                  label="Precio unitario"
-                  type="number"
-                  value={item.precioUnitario ?? ""}
-                  onChange={(e) =>
-                    handleChange(index, "precioUnitario", e.target.value)
-                  }
-                  disabled={filaDeshabilitada}
-                  InputProps={{ readOnly: !item.precioEditable }}
-                  inputProps={{ min: 0 }}
-                  InputLabelProps={{ shrink: true }}
-                />
-              </Grid>
+                <Grid item xs={12} md={3}>
+                  <TextField
+                    fullWidth
+                    label="Precio unitario"
+                    type="text"
+                    value={item.precioUnitario ?? ""}
+                    onChange={(e) =>
+                      handleChange(index, "precioUnitario", e.target.value)
+                    }
+                    disabled={filaDeshabilitada}
+                    InputProps={{ readOnly: !item.precioEditable }}
+                    inputProps={DECIMAL_INPUT_PROPS}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
 
-              <Grid item xs={12} md={3}>
-                <TextField
-                  fullWidth
-                  label="Descripción"
-                  value={item.descripcion ?? ""}
-                  disabled={filaDeshabilitada}
-                  InputProps={{ readOnly: true }}
-                  InputLabelProps={{ shrink: true }}
-                />
-              </Grid>
+                <Grid item xs={12} md={3}>
+                  <TextField
+                    fullWidth
+                    label="Descripcion"
+                    value={item.descripcion ?? ""}
+                    disabled={filaDeshabilitada}
+                    InputProps={{ readOnly: true }}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
 
-              <Grid item xs={12} md={3}>
-                <TextField
-                  fullWidth
-                  label="Subtotal"
-                  value={item.subtotal ?? 0}
-                  disabled={filaDeshabilitada}
-                  InputProps={{ readOnly: true }}
-                  InputLabelProps={{ shrink: true }}
-                  error={getErrorSubtotal(item, index)}
-                  helperText={getHelperSubtotal(item, index)}
-                />
-              </Grid>
+                <Grid item xs={12} md={3}>
+                  <TextField
+                    fullWidth
+                    label="Subtotal"
+                    value={item.subtotal ?? 0}
+                    disabled={filaDeshabilitada}
+                    InputProps={{ readOnly: true }}
+                    InputLabelProps={{ shrink: true }}
+                    error={getErrorSubtotal(item, index)}
+                    helperText={getHelperSubtotal(item, index)}
+                  />
+                </Grid>
 
-              <Grid item xs={12} md={3}>
-                <Button
-                  variant="outlined"
-                  color="error"
-                  onClick={() => eliminarActividad(index)}
-                  disabled={filaDeshabilitada}
-                  fullWidth
-                  sx={{ height: "56px" }}
-                >
-                  ELIMINAR ACTIVIDAD
-                </Button>
+                <Grid item xs={12} md={3}>
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    onClick={() => eliminarActividad(index)}
+                    disabled={filaDeshabilitada}
+                    fullWidth
+                    sx={{ height: "56px" }}
+                  >
+                    ELIMINAR ACTIVIDAD
+                  </Button>
+                </Grid>
               </Grid>
-            </Grid>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
         );
       })}
 
@@ -465,15 +481,10 @@ const FormObraBlanca = ({
       </Box>
 
       <Box sx={{ mt: 2 }}>
-        <Typography variant="h6">
-          Total Actividades: {totalGeneral}
-        </Typography>
+        <Typography variant="h6">Total Actividades: {totalGeneral}</Typography>
       </Box>
     </Box>
   );
 };
 
 export default FormObraBlanca;
-
-
-

@@ -14,6 +14,8 @@ import LoginPage from "../pages/LoginPage";
 import Register from "../pages/Register";
 import Reportes from "../pages/Reportes";
 import CotizacionBase from "../pages/CotizacionBase";
+import CotizacionBaseV2 from "../pages/CotizacionBaseV2";
+import CotizacionBaseV2Detalle from "../pages/CotizacionBaseV2Detalle";
 import CotizacionPersonalizadaDetalle from "../pages/CotizacionPersonalizadaDetalle";
 import FormulariosCotizacionPersonalizada from "../pages/FormulariosCotizacionPersonalizada";
 
@@ -97,6 +99,11 @@ const App = () => {
       <CustomRoutes>
         <Route path="/cotizacion-base" element={<CotizacionBase />} />
         <Route path="/cotizacion-base/:idCotizacion/editar" element={<CotizacionBase />} />
+        <Route path="/cotizacion-base-v2" element={<CotizacionBaseV2 />} />
+        <Route
+          path="/cotizacion-base-v2/:idCotizacion/detalles"
+          element={<CotizacionBaseV2Detalle />}
+        />
         <Route path="/cotizaciones/:idCotizacion/vista" element={<CotizacionVista />} />
         <Route
           path="/cotizacion-personalizada/formularios/:idCotizacion"

@@ -1,16 +1,18 @@
 import * as React from "react";
 import {
+  BooleanInput,
   Edit,
+  NumberInput,
+  required,
   SimpleForm,
   TextInput,
-  NumberInput,
-  BooleanInput,
-  required,
 } from "react-admin";
 
 const CatalogoItemEdit = () => (
-  <Edit title="Actualizar precio">
+  <Edit title="Actualizar precio V2">
     <SimpleForm>
+      <TextInput source="tablaOrigen" label="Tabla origen" disabled fullWidth />
+      <TextInput source="idItemOrigen" label="ID origen" disabled fullWidth />
       <TextInput source="nombreServicio" label="Servicio" disabled fullWidth />
       <TextInput source="tipoItem" label="Tipo" disabled fullWidth />
       <TextInput source="categoria" label="Categoría" disabled fullWidth />
@@ -26,6 +28,7 @@ const CatalogoItemEdit = () => (
       <NumberInput
         source="precioUnitarioProveedor"
         label="Precio proveedor"
+        helperText="En ACTIVIDAD este campo no aplica; se conserva solo para MATERIAL y PRODUCTO."
         fullWidth
       />
 

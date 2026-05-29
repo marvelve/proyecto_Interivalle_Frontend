@@ -1,23 +1,32 @@
 import * as React from "react";
 import {
-  List,
+  Button,
   Datagrid,
-  TextField,
   DateField,
   FunctionField,
+  List,
+  TextField,
   TopToolbar,
-  Button,
-  useRedirect
+  useRedirect,
 } from "react-admin";
-
 import AddIcon from "@mui/icons-material/Add";
-import VisibilityIcon from "@mui/icons-material/Visibility";
 import EventRepeatIcon from "@mui/icons-material/EventRepeat";
-import Tooltip from "@mui/material/Tooltip";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 import { Box, Chip } from "@mui/material";
+import Tooltip from "@mui/material/Tooltip";
 
-import SolicitudVacia from "./SolicitudVacia";
 import { compactDatagridSx, compactListSx } from "../../app/listStyles";
+import SolicitudVacia from "./SolicitudVacia";
+
+const ROL_ADMIN = "1";
+const ROL_SUPERVISOR = "2";
+const ROL_CLIENTE = "3";
+
+const TIPO_COTIZACION_BASE = "COTIZACION_BASE";
+const TIPO_VISITA_TECNICA = "VISITA_TECNICA";
+
+const ESTADO_PENDIENTE = "PENDIENTE";
+const ESTADO_REPROGRAMADA = "REPROGRAMADA";
 
 const estadoSolicitudChipSx = {
   backgroundColor: "#2e7d32",
@@ -42,18 +51,15 @@ const EstadoSolicitudChip = ({ estado }) => (
   <Chip
     label={estado || "-"}
     size="small"
-    sx={estado === "PENDIENTE" ? estadoPendienteChipSx : estadoSolicitudChipSx}
+    sx={estado === ESTADO_PENDIENTE ? estadoPendienteChipSx : estadoSolicitudChipSx}
   />
 );
-
-/* ===============================
-   BOTÓN CREAR COTIZACIÓN
-================================= */
 
 const CrearCotizacionButton = ({ record }) => {
   const redirect = useRedirect();
 
   const handleClick = () => {
+    // Guarda la solicitud para que el flujo de cotizacion base pueda continuar.
     localStorage.setItem("idSolicitud", record.idSolicitud);
     redirect("/cotizacion-base");
   };
@@ -65,17 +71,13 @@ const CrearCotizacionButton = ({ record }) => {
       onClick={handleClick}
       sx={{
         backgroundColor: "#2e7d32",
-        "&:hover": { backgroundColor: "#1b5e20" }
+        "&:hover": { backgroundColor: "#1b5e20" },
       }}
     >
       Crear Cotización
     </Button>
   );
 };
-
-/* ===============================
-   BOTÓN CREAR NUEVA SOLICITUD
-================================= */
 
 const SolicitudesActions = () => {
   const redirect = useRedirect();
@@ -92,17 +94,13 @@ const SolicitudesActions = () => {
   );
 };
 
-/* ===============================
-   COMPONENTE PRINCIPAL
-================================= */
-
 const SolicitudList = () => {
   const correoUsuario = localStorage.getItem("correoUsuario") || "";
   const idRol = String(localStorage.getItem("idRol") || "");
 
-  const esAdmin = idRol === "1";
-  const esSupervisor = idRol === "2";
-  const esCliente = idRol === "3";
+  const esAdmin = idRol === ROL_ADMIN;
+  const esSupervisor = idRol === ROL_SUPERVISOR;
+  const esCliente = idRol === ROL_CLIENTE;
 
   const puedeVerColumnasInternas = esAdmin || esSupervisor;
   const puedeVerTodo = esAdmin || esSupervisor;
@@ -157,7 +155,7 @@ const SolicitudList = () => {
         <FunctionField
           label="Fecha/Hora Visita"
           render={(record) => {
-            if (record?.tipoSolicitud !== "VISITA_TECNICA") return "-";
+            if (record?.tipoSolicitud !== TIPO_VISITA_TECNICA) return "-";
 
             const fecha = record?.fechaVisita || "-";
             const hora = record?.horaVisita || "-";
@@ -170,7 +168,7 @@ const SolicitudList = () => {
           <FunctionField
             label="Número Celular"
             render={(record) => {
-              if (record?.tipoSolicitud !== "VISITA_TECNICA") return "-";
+              if (record?.tipoSolicitud !== TIPO_VISITA_TECNICA) return "-";
               return record?.celularCliente || "-";
             }}
           />
@@ -195,20 +193,22 @@ const SolicitudList = () => {
         <FunctionField
           label="Acciones"
           render={(record) => {
+            // Las cotizaciones base pendientes se envian al flujo de cotizacion.
             if (
-              record?.tipoSolicitud === "COTIZACION_BASE" &&
-              (record?.estado === "PENDIENTE" ||
-                record?.estado === "REPROGRAMADA")
+              record?.tipoSolicitud === TIPO_COTIZACION_BASE &&
+              (record?.estado === ESTADO_PENDIENTE ||
+                record?.estado === ESTADO_REPROGRAMADA)
             ) {
               return <CrearCotizacionButton record={record} />;
             }
 
-            if (record?.tipoSolicitud === "VISITA_TECNICA") {
+            if (record?.tipoSolicitud === TIPO_VISITA_TECNICA) {
+              // Cliente reprograma pendientes. Admin/Supervisor tambien pueden reprogramadas.
               const puedeReprogramar =
                 (esAdmin || esSupervisor || esCliente) &&
-                (record?.estado === "PENDIENTE" ||
+                (record?.estado === ESTADO_PENDIENTE ||
                   ((esAdmin || esSupervisor) &&
-                    record?.estado === "REPROGRAMADA"));
+                    record?.estado === ESTADO_REPROGRAMADA));
 
               return (
                 <Box display="flex" gap={1} alignItems="center">
@@ -221,17 +221,18 @@ const SolicitudList = () => {
                       <VisibilityIcon />
                     </Button>
                   </Tooltip>
-                {puedeReprogramar && (
-                  <Tooltip title="Reprogramar visita">
-                    <Button
-                      label=""
-                      onClick={() => handleReprogramar(record)}
-                      sx={{ minWidth: 36, padding: "6px", color: "#14a800" }}
-                    >
-                      <EventRepeatIcon />
-                    </Button>
-                  </Tooltip>
-                )}
+
+                  {puedeReprogramar && (
+                    <Tooltip title="Reprogramar visita">
+                      <Button
+                        label=""
+                        onClick={() => handleReprogramar(record)}
+                        sx={{ minWidth: 36, padding: "6px", color: "#14a800" }}
+                      >
+                        <EventRepeatIcon />
+                      </Button>
+                    </Tooltip>
+                  )}
                 </Box>
               );
             }

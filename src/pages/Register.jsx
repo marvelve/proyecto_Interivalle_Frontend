@@ -1,21 +1,28 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
+import { apiUrl } from "../app/httpClient";
 
 const LOGO_URL = "/imagenes/landing/Logo_Landing.png";
+const REGISTER_ENDPOINT = `${apiUrl}/api/auth/register`;
+
+const FORM_INICIAL = {
+  nombreUsuario: "",
+  correoUsuario: "",
+  contrasenaUsuario: "",
+  celularUsuario: "",
+  ciudadUsuario: "",
+};
+
+const NOMBRE_REGEX = /^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]+$/;
+const CORREO_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const SOLO_NUMEROS_REGEX = /^\d+$/;
 
 const Register = () => {
   const navigate = useNavigate();
 
-  const [form, setForm] = useState({
-    nombreUsuario: "",
-    correoUsuario: "",
-    contrasenaUsuario: "",
-    celularUsuario: "",
-    ciudadUsuario: "",
-  });
-
+  const [form, setForm] = useState(FORM_INICIAL);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -29,80 +36,66 @@ const Register = () => {
     const celular = form.celularUsuario.trim();
     const ciudad = form.ciudadUsuario.trim();
 
-    // Nombre: solo letras y espacios, mínimo 5 letras reales
-    const soloLetrasYEspacios = /^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]+$/;
+    // Validacion del nombre: obligatorio, solo letras y minimo 5 letras reales.
     const soloLetrasSinEspacios = nombre.replace(/\s/g, "");
-
     if (!nombre) {
       nuevosErrores.nombreUsuario = "El nombre es obligatorio";
-    } else if (!soloLetrasYEspacios.test(nombre)) {
-      nuevosErrores.nombreUsuario =
-        "El nombre solo debe contener letras";
+    } else if (!NOMBRE_REGEX.test(nombre)) {
+      nuevosErrores.nombreUsuario = "El nombre solo debe contener letras";
     } else if (soloLetrasSinEspacios.length < 5) {
-      nuevosErrores.nombreUsuario =
-        "El nombre debe tener mínimo 5 letras";
+      nuevosErrores.nombreUsuario = "El nombre debe tener mínimo 5 letras";
     }
 
-    // Correo
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    // Validacion del correo con formato basico.
     if (!correo) {
       nuevosErrores.correoUsuario = "El correo es obligatorio";
-    } else if (!emailRegex.test(correo)) {
+    } else if (!CORREO_REGEX.test(correo)) {
       nuevosErrores.correoUsuario = "Ingrese un correo válido";
     }
 
-    // Contraseña: mínimo 6, con letras y números
+    // Validacion de contrasena: minimo 6 caracteres, letras y numeros.
     const tieneLetras = /[A-Za-z]/.test(contrasena);
     const tieneNumeros = /\d/.test(contrasena);
-
     if (!contrasena) {
       nuevosErrores.contrasenaUsuario = "La contraseña es obligatoria";
     } else if (contrasena.length < 6) {
-      nuevosErrores.contrasenaUsuario =
-        "La contraseña debe tener al menos 6 caracteres";
+      nuevosErrores.contrasenaUsuario = "La contraseña debe tener al menos 6 caracteres";
     } else if (!tieneLetras || !tieneNumeros) {
-      nuevosErrores.contrasenaUsuario =
-        "La contraseña debe contener letras y números";
+      nuevosErrores.contrasenaUsuario = "La contraseña debe contener letras y números";
     }
 
-    // Celular: solo números
-    const soloNumeros = /^\d+$/;
+    // Validacion del celular: obligatorio y solo numeros.
     if (!celular) {
       nuevosErrores.celularUsuario = "El celular es obligatorio";
-    } else if (!soloNumeros.test(celular)) {
+    } else if (!SOLO_NUMEROS_REGEX.test(celular)) {
       nuevosErrores.celularUsuario = "El celular solo debe contener números";
     }
 
-    // Ciudad
+    // Validacion de ciudad.
     if (!ciudad) {
       nuevosErrores.ciudadUsuario = "La ciudad es obligatoria";
     }
 
     setErrors(nuevosErrores);
-
     return Object.keys(nuevosErrores).length === 0;
   };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
 
-    let nuevoValor = value;
+    // Mientras escribe el celular, se dejan pasar solo numeros.
+    const nuevoValor = name === "celularUsuario" ? value.replace(/\D/g, "") : value;
 
-    // Restringir celular a solo números mientras escribe
-    if (name === "celularUsuario") {
-      nuevoValor = value.replace(/\D/g, "");
-    }
-
-    setForm({
-      ...form,
+    setForm((formActual) => ({
+      ...formActual,
       [name]: nuevoValor,
-    });
+    }));
 
-    // Limpia error del campo al escribir
-    setErrors({
-      ...errors,
+    // Limpia el error del campo que el usuario esta editando.
+    setErrors((erroresActuales) => ({
+      ...erroresActuales,
       [name]: "",
-    });
+    }));
   };
 
   const registrar = async (e) => {
@@ -115,7 +108,8 @@ const Register = () => {
     setLoading(true);
 
     try {
-      const response = await fetch("http://localhost:8081/api/auth/register", {
+      // Envia el registro al backend publico de autenticacion.
+      const response = await fetch(REGISTER_ENDPOINT, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -123,6 +117,7 @@ const Register = () => {
         body: JSON.stringify(form),
       });
 
+      // Maneja errores enviados por Spring Boot.
       if (!response.ok) {
         let mensaje = "Error al registrar usuario";
 
@@ -150,7 +145,7 @@ const Register = () => {
     <div style={styles.container}>
       <div style={styles.card}>
         <img src={LOGO_URL} alt="Interivalle" style={styles.logo} />
-        <h1 style={styles.title}>Registro</h1>
+        <h1 style={styles.title}>REGISTRO</h1>
 
         <form onSubmit={registrar}>
           <input
@@ -193,7 +188,11 @@ const Register = () => {
               onMouseDown={(event) => event.preventDefault()}
               style={styles.passwordToggle}
             >
-              {showPassword ? <Visibility fontSize="small" /> : <VisibilityOff fontSize="small" />}
+              {showPassword ? (
+                <Visibility fontSize="small" />
+              ) : (
+                <VisibilityOff fontSize="small" />
+              )}
             </button>
           </div>
           {errors.contrasenaUsuario && (
@@ -226,13 +225,14 @@ const Register = () => {
             {loading ? "Registrando..." : "Registrar"}
           </button>
         </form>
-
+      <div style={styles.registerBox}>
         <p style={styles.text}>
           ¿Ya tienes cuenta?{" "}
           <Link to="/login" style={styles.link}>
             Inicia sesión
           </Link>
         </p>
+      </div>
       </div>
     </div>
   );
@@ -320,14 +320,27 @@ const styles = {
     cursor: "pointer",
     marginTop: "10px",
   },
+   registerBox: {
+    marginTop: "22px",
+    padding: "14px 16px",
+    borderRadius: "10px",
+    backgroundColor: "#ecfdf3",
+    border: "1px solid #bbf7d0",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: "8px",
+    flexWrap: "wrap",
+  },
   text: {
     marginTop: "18px",
     fontSize: "14px",
   },
   link: {
     color: "#0a8f08",
-    fontWeight: "bold",
     textDecoration: "none",
+    fontWeight: 800,
+    fontSize: "17px",
   },
 };
 

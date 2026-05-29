@@ -24,6 +24,11 @@ const toEnteroNoNegativo = (valor) => {
   return Number.isNaN(numero) || numero < 0 ? 0 : numero;
 };
 
+const opcionesCantidadBanosObraBlanca = ["0", "1", "2"];
+
+const limitarCantidadBanosObraBlanca = (valor) =>
+  Math.min(2, toEnteroNoNegativo(valor));
+
 const toNumeroNoNegativo = (valor) => {
   const numero = Number.parseFloat(valor);
   return Number.isNaN(numero) || numero < 0 ? 0 : numero;
@@ -134,6 +139,7 @@ const CotizacionBase = () => {
 
   const [formDataCarpinteria, setFormDataCarpinteria] = useState({
     cantidadCloset: "",
+    vestierBasico: false,
     cantidadPuertas: "",
     muebleAltoCocina: "",
     muebleBajoCocina: "",
@@ -238,7 +244,7 @@ const CotizacionBase = () => {
     if (manoObra) {
       setFormDataManoObra({
         medidaAreaPrivada: valorInput(manoObra.medidaAreaPrivada),
-        cantidadBanos: valorInput(manoObra.cantidadBanos ?? 0),
+        cantidadBanos: String(limitarCantidadBanosObraBlanca(manoObra.cantidadBanos ?? 0)),
         tipoCielo: manoObra.tipoCielo || "ESTUCO",
         divisionPared: !!manoObra.divisionPared,
       });
@@ -249,6 +255,7 @@ const CotizacionBase = () => {
       const cantidadBanos = valorInput(carpinteria.cantidadBanos);
       setFormDataCarpinteria({
         cantidadCloset: valorInput(carpinteria.cantidadCloset),
+        vestierBasico: !!carpinteria.vestierBasico,
         cantidadPuertas: valorInput(carpinteria.cantidadPuertas),
         muebleAltoCocina: valorInput(carpinteria.muebleAltoCocina),
         muebleBajoCocina: valorInput(carpinteria.muebleBajoCocina),
@@ -318,11 +325,19 @@ const CotizacionBase = () => {
     }));
   };
 
-  const handleSwitchManoObra = (e) => {
-    const { name, checked } = e.target;
+  const handleBooleanManoObra = (e) => {
+    const { name, value } = e.target;
     setFormDataManoObra((prev) => ({
       ...prev,
-      [name]: checked,
+      [name]: value === "SI",
+    }));
+  };
+
+  const handleBooleanCarpinteria = (e) => {
+    const { name, value } = e.target;
+    setFormDataCarpinteria((prev) => ({
+      ...prev,
+      [name]: value === "SI",
     }));
   };
 
@@ -333,7 +348,7 @@ const CotizacionBase = () => {
 
     setFormDataManoObra((prev) => ({
       ...prev,
-      cantidadBanos: String(toEnteroNoNegativo(prev.cantidadBanos)),
+      cantidadBanos: String(limitarCantidadBanosObraBlanca(prev.cantidadBanos)),
     }));
   };
 
@@ -504,7 +519,7 @@ const CotizacionBase = () => {
               medidaAreaPrivada: formDataManoObra.medidaAreaPrivada
                 ? Number(formDataManoObra.medidaAreaPrivada)
                 : null,
-              cantidadBanos: toEnteroNoNegativo(formDataManoObra.cantidadBanos),
+              cantidadBanos: limitarCantidadBanosObraBlanca(formDataManoObra.cantidadBanos),
               tipoCielo: formDataManoObra.tipoCielo || null,
               divisionPared: !!formDataManoObra.divisionPared
             }
@@ -514,6 +529,7 @@ const CotizacionBase = () => {
               cantidadCloset: formDataCarpinteria.cantidadCloset
                 ? Number(formDataCarpinteria.cantidadCloset)
                 : 0,
+              vestierBasico: !!formDataCarpinteria.vestierBasico,
               cantidadPuertas: formDataCarpinteria.cantidadPuertas
                 ? Number(formDataCarpinteria.cantidadPuertas)
                 : 0,
@@ -567,7 +583,9 @@ const CotizacionBase = () => {
         ? esCliente
           ? `${apiUrl}/api/cliente/cotizaciones/${idCotizacion}/base`
           : `${apiUrl}/api/cotizaciones/${idCotizacion}/base`
-        : `${apiUrl}/api/cliente/cotizaciones/generar-base`;
+        : esCliente
+          ? `${apiUrl}/api/cliente/cotizaciones/generar-base`
+          : `${apiUrl}/api/cotizaciones/generar-base`;
 
       const { json } = await httpClient(urlGuardar, {
         method: modoEdicion ? "PUT" : "POST",
@@ -658,7 +676,7 @@ const CotizacionBase = () => {
               <Grid item xs={12} md={3}>
                 <TextField
                   fullWidth
-                  label="Medida área privada"
+                  label="Medida(MT) área privada"
                   name="medidaAreaPrivada"
                   value={formDataManoObra.medidaAreaPrivada}
                   onChange={handleChangeManoObra}
@@ -671,15 +689,22 @@ const CotizacionBase = () => {
               <Grid item xs={12} md={3}>
                 <TextField
                   fullWidth
+                  select
                   label="Cantidad baños"
                   name="cantidadBanos"
-                  value={formDataManoObra.cantidadBanos}
+                  value={String(limitarCantidadBanosObraBlanca(formDataManoObra.cantidadBanos))}
                   onChange={handleChangeManoObra}
                   onBlur={handleBlurManoObra}
-                  type="number"
-                  inputProps={{ min: 0, step: 1 }}
                   variant="standard"
-                />
+                  InputLabelProps={{ shrink: true }}
+                  sx={{ minWidth: 160 }}
+                >
+                  {opcionesCantidadBanosObraBlanca.map((cantidad) => (
+                    <MenuItem key={cantidad} value={cantidad}>
+                      {cantidad}
+                    </MenuItem>
+                  ))}
+                </TextField>
               </Grid>
 
               <Grid item xs={12} md={2}>
@@ -700,17 +725,21 @@ const CotizacionBase = () => {
                 </TextField>
               </Grid>
 
-              <Grid item xs={12} md={4}>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={formDataManoObra.divisionPared}
-                      onChange={handleSwitchManoObra}
-                      name="divisionPared"
-                    />
-                  }
+              <Grid item xs={12} md={4} lg={3}>
+                <TextField
+                  fullWidth
+                  select
                   label="¿Cierre espacio multiple?"
-                />
+                  name="divisionPared"
+                  value={formDataManoObra.divisionPared ? "SI" : "NO"}
+                  onChange={handleBooleanManoObra}
+                  variant="standard"
+                  InputLabelProps={{ shrink: true }}
+                  sx={{ minWidth: 240 }}
+                >
+                  <MenuItem value="SI">Sí</MenuItem>
+                  <MenuItem value="NO">No</MenuItem>
+                </TextField>
               </Grid>
             </Grid>
 
@@ -725,6 +754,7 @@ const CotizacionBase = () => {
             </Typography>
 
             <Grid container spacing={3}>
+
               <Grid item xs={12} md={4}>
                 <TextField
                   fullWidth
@@ -735,6 +765,23 @@ const CotizacionBase = () => {
                   type="number"
                   variant="standard"
                 />
+              </Grid>
+
+              <Grid item xs={12} md={4}>
+                <TextField
+                  fullWidth
+                  select
+                  label="¿Vestier basico?"
+                  name="vestierBasico"
+                  value={formDataCarpinteria.vestierBasico ? "SI" : "NO"}
+                  onChange={handleBooleanCarpinteria}
+                  variant="standard"
+                  InputLabelProps={{ shrink: true }}
+                  sx={{ minWidth: 180 }}
+                >
+                  <MenuItem value="SI">Sí</MenuItem>
+                  <MenuItem value="NO">No</MenuItem>
+                </TextField>
               </Grid>
 
               <Grid item xs={12} md={4}>
@@ -953,7 +1000,7 @@ const CotizacionBase = () => {
                   <Grid item xs={12} md={4}>
                     <TextField
                       fullWidth
-                      label="Medida cocina"
+                      label="Medida cocina (MT)"
                       name="medidaCocina"
                       value={formDataMezon.medidaCocina}
                       onChange={handleChangeMezon}
@@ -993,7 +1040,7 @@ const CotizacionBase = () => {
                   <Grid item xs={12} md={4}>
                     <TextField
                       fullWidth
-                      label="Medida Barra"
+                      label="Medida Barra (MT)"
                       name="medidaBarra"
                       value={formDataMezon.medidaBarra}
                       onChange={handleChangeMezon}
@@ -1033,7 +1080,7 @@ const CotizacionBase = () => {
                   <Grid item xs={12} md={4}>
                     <TextField
                       fullWidth
-                      label="Medida Mesón"
+                      label="Medida Mesón (MT)"
                       name="medidaLavamanos"
                       value={formDataMezon.medidaLavamanos}
                       onChange={handleChangeMezon}
@@ -1053,18 +1100,6 @@ const CotizacionBase = () => {
                     />
                   </Grid>
                 </>
-              )}
-
-              {hayMezonActivo && (
-                <Grid item xs={12} md={4}>
-                  <TextField
-                    fullWidth
-                    label="Precio Mt Mármol"
-                    value={formatearMoneda(precioMetroMarmol)}
-                    variant="standard"
-                    InputProps={{ readOnly: true }}
-                  />
-                </Grid>
               )}
             </Grid>
 

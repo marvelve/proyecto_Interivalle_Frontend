@@ -78,10 +78,18 @@ const obtenerServiciosDeSolicitud = (data) => {
 const esCotizacionCerrada = (estado) =>
   ["APROBADA", "RECHAZADA"].includes((estado || "").toString().toUpperCase());
 
+const normalizarDecimal = (value) =>
+  String(value ?? "").trim().replace(",", ".");
+
 const toNumberOrNull = (value) => {
   if (value === "" || value === null || value === undefined) return null;
-  const n = Number(value);
-  return Number.isNaN(n) ? null : n;
+  const n = Number(normalizarDecimal(value));
+  return Number.isFinite(n) ? n : null;
+};
+
+const toNumberSeguro = (value) => {
+  const n = Number(normalizarDecimal(value));
+  return Number.isFinite(n) ? n : 0;
 };
 
 const esTipoMetro = (tipoCobro = "") =>
@@ -99,24 +107,24 @@ const filaTieneDatos = (item) => {
       item.lugar?.trim() ||
       item.cantidad !== "" ||
       item.medida !== "" ||
-      Number(item.subtotal) > 0
+      toNumberSeguro(item.subtotal) > 0
   );
 };
 
 const filaEsValida = (item) => {
   if (!item.idActividad) return false;
   if (!item.lugar || !item.lugar.trim()) return false;
-  if (!item.subtotal || Number(item.subtotal) <= 0) return false;
+  if (!item.subtotal || toNumberSeguro(item.subtotal) <= 0) return false;
 
   if (esTipoMetro(item.tipoCobro)) {
-    return Number(item.medida || 0) > 0;
+    return toNumberSeguro(item.medida) > 0;
   }
 
   if (esTipoUnidad(item.tipoCobro)) {
-    return Number(item.cantidad || 0) > 0;
+    return toNumberSeguro(item.cantidad) > 0;
   }
 
-  return Number(item.cantidad || 0) > 0 || Number(item.medida || 0) > 0;
+  return toNumberSeguro(item.cantidad) > 0 || toNumberSeguro(item.medida) > 0;
 };
 
 const FormulariosCotizacionPersonalizada = () => {
@@ -168,7 +176,7 @@ const FormulariosCotizacionPersonalizada = () => {
 
   const cotizacionCerrada = esCotizacionCerrada(cotizacion?.estado);
 
-  const actividadesPorServicio = useMemo(() => {
+const actividadesPorServicio = useMemo(() => {
     const pertenece = (item, idServicio) => {
       const id = Number(obtenerIdServicio(item?.servicios || item));
       const nombreServicio = normalizarTexto(
@@ -191,6 +199,7 @@ const FormulariosCotizacionPersonalizada = () => {
       return false;
     };
 
+    // Se separa el catalogo por servicio para reutilizar el mismo formulario visual.
     return {
       1: actividadesCatalogo.filter((item) => pertenece(item, 1)),
       2: actividadesCatalogo.filter((item) => pertenece(item, 2)),
@@ -207,6 +216,7 @@ const FormulariosCotizacionPersonalizada = () => {
     try {
       setLoading(true);
 
+      // Primero intenta recuperar los servicios guardados cuando se genero la cotizacion base.
       const serviciosLS = JSON.parse(
         localStorage.getItem("serviciosSeleccionados") || "[]"
       );
@@ -216,6 +226,7 @@ const FormulariosCotizacionPersonalizada = () => {
       }
 
       try {
+        // Catalogo de actividades que el usuario puede adicionar.
         const { json: catalogoJson } = await httpClient(
           `${apiUrl}/api/actividades-personalizadas`,
           { method: "GET" }
@@ -225,6 +236,7 @@ const FormulariosCotizacionPersonalizada = () => {
         console.warn("No fue posible cargar el catálogo de actividades:", errorCatalogo);
       }
 
+      // Consulta la cotizacion base para conocer estado, proyecto y solicitud asociada.
       const { json: cotizacionJson } = await httpClient(
         `${apiUrl}/api/cliente/cotizaciones/${idCotizacion}`,
         { method: "GET" }
@@ -242,6 +254,7 @@ const FormulariosCotizacionPersonalizada = () => {
         setIdSolicitud(solicitudIdDesdeCotizacion);
 
         try {
+          // La solicitud confirma los servicios seleccionados originalmente por el cliente.
           const { json: solicitudJson } = await httpClient(
             `${apiUrl}/api/solicitudes/${solicitudIdDesdeCotizacion}`,
             { method: "GET" }
@@ -269,6 +282,7 @@ const FormulariosCotizacionPersonalizada = () => {
 
   const cargarPersonalizadaExistente = async () => {
     try {
+      // Si ya habia adicionales guardados, se muestran como filas bloqueadas.
       const { json } = await httpClient(
         `${apiUrl}/api/cotizaciones-personalizadas/cotizacion/${idCotizacion}/detalle`,
         { method: "GET" }
@@ -316,13 +330,14 @@ const FormulariosCotizacionPersonalizada = () => {
   const validarFormularioServicio = (idServicio, items) => {
     const nuevosConDatos = items.filter(filaTieneDatos);
 
+    // Valida solo las filas nuevas. Las filas ya guardadas no se reenvian.
     const erroresServicio = items.map((item) => {
       if (!filaTieneDatos(item)) return {};
 
       const error = {};
       if (!item.idActividad) error.idActividad = "La actividad es obligatoria";
       if (!item.lugar || !item.lugar.trim()) error.lugar = "El lugar es obligatorio";
-      if (!item.subtotal || Number(item.subtotal) <= 0) {
+      if (!item.subtotal || toNumberSeguro(item.subtotal) <= 0) {
         error.subtotal = "El subtotal es obligatorio y debe ser mayor a 0";
       }
       return error;
@@ -344,6 +359,7 @@ const FormulariosCotizacionPersonalizada = () => {
     let hayActividadNueva = false;
     let todoValido = true;
 
+    // Recorre solamente los servicios que pertenecen a esta cotizacion.
     serviciosIds.forEach((idServicio) => {
       const items = formularios[idServicio] || [];
       if (items.some(filaTieneDatos)) hayActividadNueva = true;
@@ -379,6 +395,7 @@ const FormulariosCotizacionPersonalizada = () => {
       observacionGeneral: "Adición de actividades personalizadas",
     };
 
+    // Crea la cabecera cotizacion_personalizada antes de guardar los detalles.
     const { json } = await httpClient(`${apiUrl}/api/cotizaciones-personalizadas`, {
       method: "POST",
       body: JSON.stringify(payload),
@@ -419,6 +436,7 @@ const FormulariosCotizacionPersonalizada = () => {
         descripcion: item.descripcion || act?.nombreActividad || "",
       };
 
+      // Obra Blanca espera el id de la cotizacion base.
       await httpClient(`${apiUrl}/api/obra-blanca`, {
         method: "POST",
         body: JSON.stringify(payload),
@@ -490,6 +508,7 @@ const FormulariosCotizacionPersonalizada = () => {
       }
 
       if (url) {
+        // Carpinteria, vidrio y meson reciben el id de la cotizacion personalizada.
         await httpClient(url, {
           method: "POST",
           body: JSON.stringify(payload),
@@ -500,6 +519,7 @@ const FormulariosCotizacionPersonalizada = () => {
   };
 
   const guardarTodosLosFormularios = async (idPersonalizada) => {
+    // Guarda cada grupo de adicionales segun los servicios seleccionados.
     await guardarObraBlanca();
     if (serviciosIds.includes(2)) {
       await guardarServicioProducto(2, idPersonalizada, carpinteria);
@@ -513,6 +533,7 @@ const FormulariosCotizacionPersonalizada = () => {
   };
 
   const recalcularCotizacion = async (idPersonalizada) => {
+    // Actualiza subtotal y total de la cabecera personalizada.
     await httpClient(
       `${apiUrl}/api/cotizaciones-personalizadas/${idPersonalizada}/recalcular`,
       {
@@ -535,6 +556,7 @@ const FormulariosCotizacionPersonalizada = () => {
     try {
       setGuardando(true);
 
+      // Flujo principal: crear cabecera, guardar detalles, recalcular y volver a la vista.
       const idPersonalizada = await crearCotizacionSiNoExiste();
       await guardarTodosLosFormularios(idPersonalizada);
       await recalcularCotizacion(idPersonalizada);
@@ -680,5 +702,3 @@ const FormulariosCotizacionPersonalizada = () => {
 };
 
 export default FormulariosCotizacionPersonalizada;
-
-

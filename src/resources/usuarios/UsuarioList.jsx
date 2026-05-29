@@ -1,9 +1,4 @@
-import {
-  List,
-  Datagrid,
-  TextField,
-  EmailField,
-} from "react-admin";
+import { Datagrid, EmailField, List, TextField } from "react-admin";
 
 const UsuarioList = () => {
   return (

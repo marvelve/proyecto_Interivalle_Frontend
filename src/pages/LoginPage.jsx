@@ -6,23 +6,26 @@ import VisibilityOff from "@mui/icons-material/VisibilityOff";
 
 const LOGO_URL = "/imagenes/landing/Logo_Landing.png";
 
+const FORM_INICIAL = {
+  username: "",
+  password: "",
+};
+
 const LoginPage = () => {
   const login = useLogin();
   const notify = useNotify();
 
-  const [form, setForm] = useState({
-    username: "",
-    password: "",
-  });
-
+  const [form, setForm] = useState(FORM_INICIAL);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (e) => {
-    setForm({
-      ...form,
-      [e.target.name]: e.target.value,
-    });
+    const { name, value } = e.target;
+
+    setForm((formActual) => ({
+      ...formActual,
+      [name]: value,
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -30,6 +33,7 @@ const LoginPage = () => {
     setLoading(true);
 
     try {
+      // React Admin usa authProvider para llamar al backend de login.
       await login(form);
     } catch (error) {
       notify("Correo o contraseña incorrectos", { type: "error" });
@@ -42,7 +46,7 @@ const LoginPage = () => {
     <div style={styles.container}>
       <div style={styles.card}>
         <img src={LOGO_URL} alt="Interivalle" style={styles.logo} />
-        <h1 style={styles.title}>Iniciar Sesión</h1>
+        <h1 style={styles.title}>INGRESAR</h1>
 
         <form onSubmit={handleSubmit}>
           <input
@@ -73,7 +77,11 @@ const LoginPage = () => {
               onMouseDown={(event) => event.preventDefault()}
               style={styles.passwordToggle}
             >
-              {showPassword ? <Visibility fontSize="small" /> : <VisibilityOff fontSize="small" />}
+              {showPassword ? (
+                <Visibility fontSize="small" />
+              ) : (
+                <VisibilityOff fontSize="small" />
+              )}
             </button>
           </div>
 
@@ -85,9 +93,10 @@ const LoginPage = () => {
         <div style={styles.registerBox}>
           <span style={styles.registerText}>¿No tienes cuenta?</span>
           <Link to="/register" style={styles.link}>
-            Regístrate aquí
+            REGISTRATE AQUI
           </Link>
         </div>
+
       </div>
     </div>
   );
@@ -119,11 +128,8 @@ const styles = {
     marginBottom: "18px",
   },
   title: {
-    margin: "0 0 28px",
-    fontSize: "36px",
-    lineHeight: 1.15,
-    fontWeight: 800,
-    color: "#111827",
+    margin: "0 0 25px",
+    fontSize: "32px",
   },
   input: {
     width: "100%",

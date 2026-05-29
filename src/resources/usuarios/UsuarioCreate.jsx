@@ -1,16 +1,25 @@
 import {
   Create,
+  SelectInput,
   SimpleForm,
   TextInput,
-  SelectInput,
   required,
 } from "react-admin";
+
+const ROLES = [
+  { id: 3, name: "CLIENTE" },
+  { id: 2, name: "SUPERVISOR" },
+  { id: 1, name: "ADMIN" },
+];
+
+const NOMBRE_REGEX = /^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]+$/;
+const CORREO_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const validarNombre = (value) => {
   if (!value) return "El nombre es obligatorio";
 
-  const regex = /^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]+$/;
-  if (!regex.test(value)) {
+  // Permite letras y espacios, igual que el registro publico.
+  if (!NOMBRE_REGEX.test(value)) {
     return "El nombre solo debe contener letras y espacios";
   }
 
@@ -24,8 +33,7 @@ const validarNombre = (value) => {
 const validarCorreo = (value) => {
   if (!value) return "El correo es obligatorio";
 
-  const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!regex.test(value)) {
+  if (!CORREO_REGEX.test(value)) {
     return "Ingrese un correo válido";
   }
 
@@ -42,9 +50,11 @@ const validarContrasena = (value) => {
 
 const validarCelular = (value) => {
   if (!value) return "El celular es obligatorio";
+
   if (!/^\d+$/.test(value)) {
     return "El celular solo debe contener números";
   }
+
   return undefined;
 };
 
@@ -91,11 +101,7 @@ const UsuarioCreate = () => {
         <SelectInput
           source="idRol"
           label="Rol"
-          choices={[
-            { id: 3, name: "CLIENTE" },
-            { id: 2, name: "SUPERVISOR" },
-            { id: 1, name: "ADMIN" },
-          ]}
+          choices={ROLES}
           defaultValue={3}
           validate={[required()]}
         />

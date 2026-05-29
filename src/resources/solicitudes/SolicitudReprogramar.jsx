@@ -2,18 +2,18 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   Box,
+  Button,
   Card,
   CardContent,
-  Typography,
   Grid,
-  TextField,
   MenuItem,
-  Button
+  TextField,
+  Typography,
 } from "@mui/material";
 import { useNotify } from "react-admin";
 import httpClient, { apiUrl } from "../../app/httpClient";
 
-const horariosVisita = [
+const HORARIOS_VISITA = [
   { value: "08:00", label: "08:00 AM" },
   { value: "09:00", label: "09:00 AM" },
   { value: "10:00", label: "10:00 AM" },
@@ -22,8 +22,37 @@ const horariosVisita = [
   { value: "14:00", label: "02:00 PM" },
   { value: "15:00", label: "03:00 PM" },
   { value: "16:00", label: "04:00 PM" },
-  { value: "17:00", label: "05:00 PM" }
+  { value: "17:00", label: "05:00 PM" },
 ];
+
+const FORM_INICIAL = {
+  idSolicitud: "",
+  nombreProyecto: "",
+  fechaVisita: "",
+  horaVisita: "08:00",
+  direccionVisita: "",
+  celularCliente: "",
+  estado: "",
+};
+
+const obtenerFechaMinima = () => {
+  const hoy = new Date();
+  hoy.setDate(hoy.getDate() + 1);
+  return hoy.toISOString().split("T")[0];
+};
+
+const esFechaFutura = (fecha) => {
+  if (!fecha) return false;
+
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+
+  const fechaIngresada = new Date(`${fecha}T00:00:00`);
+  return fechaIngresada > hoy;
+};
+
+const validarHoraVisita = (hora) =>
+  HORARIOS_VISITA.some((item) => item.value === hora);
 
 const SolicitudReprogramar = () => {
   const { idSolicitud } = useParams();
@@ -38,63 +67,25 @@ const SolicitudReprogramar = () => {
 
   const [loading, setLoading] = useState(true);
   const [guardando, setGuardando] = useState(false);
-
-  const [formData, setFormData] = useState({
-    idSolicitud: "",
-    nombreProyecto: "",
-    fechaVisita: "",
-    horaVisita: "08:00",
-    direccionVisita: "",
-    celularCliente: "",
-    estado: ""
-  });
-
-  const obtenerFechaMinima = () => {
-    const hoy = new Date();
-    hoy.setDate(hoy.getDate() + 1);
-    return hoy.toISOString().split("T")[0];
-  };
+  const [formData, setFormData] = useState(FORM_INICIAL);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+
     setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
-  };
-
-  const validarHoraVisita = (hora) => {
-    const horasPermitidas = [
-      "08:00",
-      "09:00",
-      "10:00",
-      "11:00",
-      "12:00",
-      "14:00",
-      "15:00",
-      "16:00",
-      "17:00"
-    ];
-    return horasPermitidas.includes(hora);
-  };
-
-  const esFechaFutura = (fecha) => {
-    if (!fecha) return false;
-
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
-
-    const fechaIngresada = new Date(fecha + "T00:00:00");
-    return fechaIngresada > hoy;
   };
 
   const cargarSolicitud = async () => {
     try {
       setLoading(true);
 
+      // Validacion local de permisos segun rol guardado en login.
       if (!puedeReprogramar) {
-        notify("No tiene permisos para reprogramar visitas tecnicas", {
-          type: "warning"
+        notify("No tiene permisos para reprogramar visitas técnicas", {
+          type: "warning",
         });
         navigate(`/solicitudes/${idSolicitud}/show`);
         return;
@@ -105,8 +96,8 @@ const SolicitudReprogramar = () => {
       );
 
       if (json?.tipoSolicitud !== "VISITA_TECNICA") {
-        notify("Solo las visitas tecnicas se pueden reprogramar", {
-          type: "warning"
+        notify("Solo las visitas técnicas se pueden reprogramar", {
+          type: "warning",
         });
         navigate(`/solicitudes/${idSolicitud}/show`);
         return;
@@ -118,12 +109,13 @@ const SolicitudReprogramar = () => {
 
       if (!puedeReprogramarEstado) {
         notify("El cliente solo puede reprogramar visitas pendientes", {
-          type: "warning"
+          type: "warning",
         });
         navigate(`/solicitudes/${idSolicitud}/show`);
         return;
       }
 
+      // Carga los datos actuales; solo fecha y hora son editables.
       setFormData({
         idSolicitud: json?.idSolicitud || "",
         nombreProyecto: json?.nombreProyecto || "",
@@ -131,7 +123,7 @@ const SolicitudReprogramar = () => {
         horaVisita: json?.horaVisita ? json.horaVisita.slice(0, 5) : "08:00",
         direccionVisita: json?.direccionVisita || "",
         celularCliente: json?.celularCliente || "",
-        estado: json?.estado || ""
+        estado: json?.estado || "",
       });
     } catch (error) {
       console.error(error);
@@ -152,6 +144,7 @@ const SolicitudReprogramar = () => {
   }, [idSolicitud]);
 
   const handleReprogramar = async () => {
+    // Validaciones antes de enviar al backend.
     if (!formData.fechaVisita) {
       notify("La fecha de visita es obligatoria", { type: "warning" });
       return;
@@ -169,7 +162,7 @@ const SolicitudReprogramar = () => {
 
     if (!validarHoraVisita(formData.horaVisita)) {
       notify("La hora debe estar entre 8 a 12 AM o 2 a 5 PM", {
-        type: "warning"
+        type: "warning",
       });
       return;
     }
@@ -183,16 +176,16 @@ const SolicitudReprogramar = () => {
           method: "PUT",
           body: JSON.stringify({
             fechaVisita: formData.fechaVisita,
-            horaVisita: formData.horaVisita
+            horaVisita: formData.horaVisita,
           }),
           headers: new Headers({
-            "Content-Type": "application/json"
-          })
+            "Content-Type": "application/json",
+          }),
         }
       );
 
       notify("Visita técnica reprogramada correctamente", {
-        type: "success"
+        type: "success",
       });
 
       navigate(`/solicitudes/${idSolicitud}/show`);
@@ -275,7 +268,7 @@ const SolicitudReprogramar = () => {
                 value={formData.horaVisita}
                 onChange={handleChange}
               >
-                {horariosVisita.map((hora) => (
+                {HORARIOS_VISITA.map((hora) => (
                   <MenuItem key={hora.value} value={hora.value}>
                     {hora.label}
                   </MenuItem>
@@ -317,7 +310,7 @@ const SolicitudReprogramar = () => {
               disabled={guardando}
               sx={{
                 backgroundColor: "#2e7d32",
-                "&:hover": { backgroundColor: "#1b5e20" }
+                "&:hover": { backgroundColor: "#1b5e20" },
               }}
             >
               {guardando ? "Reprogramando..." : "Reprogramar"}

@@ -1,19 +1,25 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Button,
   Card,
   CardContent,
   Grid,
+  MenuItem,
   TextField,
   Typography,
 } from "@mui/material";
 import { crearAvance, actualizarAvance } from "./SeguimientoService";
 
+const DECIMAL_INPUT_PROPS = {
+  inputMode: "decimal",
+  pattern: "[0-9]*[.,]?[0-9]*",
+};
+
 const tieneValor = (valor) => valor !== undefined && valor !== null && valor !== "";
 
 const normalizarNumero = (valor, fallback = 0) => {
-  const numero = Number(valor);
+  const numero = Number(String(valor ?? "").trim().replace(",", "."));
   return Number.isFinite(numero) ? numero : fallback;
 };
 
@@ -43,6 +49,29 @@ const SeguimientoForm = ({
 
   const [guardando, setGuardando] = useState(false);
   const totalSemanasCronograma = normalizarNumero(totalSemanas);
+  const totalSemanasEnteras = Math.floor(totalSemanasCronograma);
+
+  const opcionesSemana = useMemo(() => {
+    if (totalSemanasEnteras <= 0) {
+      return [];
+    }
+
+    return Array.from({ length: totalSemanasEnteras }, (_, index) => index + 1);
+  }, [totalSemanasEnteras]);
+
+  const primeraSemanaDisponible = useMemo(() => {
+    const semanasRegistradas = new Set(
+      (Array.isArray(avancesExistentes) ? avancesExistentes : [])
+        .map((avance) => normalizarNumero(avance?.numeroSemana))
+        .filter((semana) => semana > 0)
+    );
+
+    return (
+      opcionesSemana.find((semana) => !semanasRegistradas.has(semana)) ||
+      opcionesSemana[0] ||
+      ""
+    );
+  }, [avancesExistentes, opcionesSemana]);
 
   const calcularPorcentajeGeneralSistema = (
     numeroSemana,
@@ -90,7 +119,7 @@ const SeguimientoForm = ({
         : Math.max(...porcentajesPorSemana.keys(), semanaActual, 1);
 
     const sumaPorcentajes = [...porcentajesPorSemana.values()].reduce(
-      (acumulado, porcentaje) => acumulado + Number(porcentaje || 0),
+      (acumulado, porcentaje) => acumulado + normalizarNumero(porcentaje),
       0
     );
 
@@ -99,14 +128,14 @@ const SeguimientoForm = ({
 
   useEffect(() => {
     setForm({
-      numeroSemana: avanceInicial?.numeroSemana || "",
+      numeroSemana: avanceInicial?.numeroSemana || primeraSemanaDisponible,
       titulo: avanceInicial?.titulo || "",
       descripcion: avanceInicial?.descripcion || "",
       observaciones: avanceInicial?.observaciones || "",
       porcentajeSemana: avanceInicial?.porcentajeSemana ?? "",
       porcentajeGeneral: avanceInicial?.porcentajeGeneral ?? "",
     });
-  }, [avanceInicial]);
+  }, [avanceInicial, primeraSemanaDisponible]);
 
   useEffect(() => {
     const numeroSemana = normalizarNumero(form.numeroSemana);
@@ -124,8 +153,10 @@ const SeguimientoForm = ({
 
     setForm((prev) => {
       if (
-        Number(prev.porcentajeSemana) === Number(porcentajeSemana) &&
-        Number(prev.porcentajeGeneral) === Number(porcentajeGeneral)
+        normalizarNumero(prev.porcentajeSemana) ===
+          normalizarNumero(porcentajeSemana) &&
+        normalizarNumero(prev.porcentajeGeneral) ===
+          normalizarNumero(porcentajeGeneral)
       ) {
         return prev;
       }
@@ -153,8 +184,18 @@ const SeguimientoForm = ({
   };
 
   const validar = () => {
-    if (!form.numeroSemana || Number(form.numeroSemana) <= 0) {
+    if (!form.numeroSemana || normalizarNumero(form.numeroSemana) <= 0) {
       alert("La semana es obligatoria");
+      return false;
+    }
+
+    if (totalSemanasEnteras <= 0) {
+      alert("El cronograma no tiene semanas registradas");
+      return false;
+    }
+
+    if (normalizarNumero(form.numeroSemana) > totalSemanasEnteras) {
+      alert(`La semana debe estar entre 1 y ${totalSemanasEnteras} para este cronograma`);
       return false;
     }
 
@@ -168,19 +209,19 @@ const SeguimientoForm = ({
       return false;
     }
 
-    const porcentajeSemana = Number(form.porcentajeSemana || 0);
+    const porcentajeSemana = normalizarNumero(form.porcentajeSemana);
     const porcentajeGeneral = calcularPorcentajeGeneralSistema(
       form.numeroSemana,
       porcentajeSemana,
       avanceInicial?.porcentajeGeneral
     );
 
-    if (Number(porcentajeSemana || 0) < 0 || Number(porcentajeSemana || 0) > 100) {
+    if (normalizarNumero(porcentajeSemana) < 0 || normalizarNumero(porcentajeSemana) > 100) {
       alert("El porcentaje de semana debe estar entre 0 y 100");
       return false;
     }
 
-    if (Number(porcentajeGeneral || 0) < 0 || Number(porcentajeGeneral || 0) > 100) {
+    if (normalizarNumero(porcentajeGeneral) < 0 || normalizarNumero(porcentajeGeneral) > 100) {
       alert("El porcentaje general debe estar entre 0 y 100");
       return false;
     }
@@ -192,13 +233,24 @@ const SeguimientoForm = ({
     if (avanceInicial?.idAvance) return null;
 
     return (Array.isArray(avancesExistentes) ? avancesExistentes : []).find(
-      (avance) => Number(avance?.numeroSemana) === Number(form.numeroSemana)
+      (avance) =>
+        normalizarNumero(avance?.numeroSemana) === normalizarNumero(form.numeroSemana)
     );
   };
 
   const handleSubmit = async () => {
-    if (!form.numeroSemana || Number(form.numeroSemana) <= 0) {
+    if (!form.numeroSemana || normalizarNumero(form.numeroSemana) <= 0) {
       alert("La semana es obligatoria");
+      return;
+    }
+
+    if (totalSemanasEnteras <= 0) {
+      alert("El cronograma no tiene semanas registradas");
+      return;
+    }
+
+    if (normalizarNumero(form.numeroSemana) > totalSemanasEnteras) {
+      alert(`La semana debe estar entre 1 y ${totalSemanasEnteras} para este cronograma`);
       return;
     }
 
@@ -221,7 +273,7 @@ const SeguimientoForm = ({
     try {
       setGuardando(true);
 
-      const porcentajeSemana = Number(form.porcentajeSemana || 0);
+      const porcentajeSemana = normalizarNumero(form.porcentajeSemana);
       const porcentajeGeneral = calcularPorcentajeGeneralSistema(
         form.numeroSemana,
         porcentajeSemana,
@@ -230,12 +282,12 @@ const SeguimientoForm = ({
 
       const payload = {
         idCronograma: Number(idCronograma),
-        numeroSemana: Number(form.numeroSemana),
+        numeroSemana: normalizarNumero(form.numeroSemana),
         titulo: form.titulo.trim(),
         descripcion: form.descripcion.trim(),
         observaciones: form.observaciones.trim(),
-        porcentajeSemana: Number(porcentajeSemana || 0),
-        porcentajeGeneral: Number(porcentajeGeneral || 0),
+        porcentajeSemana: normalizarNumero(porcentajeSemana),
+        porcentajeGeneral: normalizarNumero(porcentajeGeneral),
       };
 
       let resultado;
@@ -270,12 +322,22 @@ const SeguimientoForm = ({
               fullWidth
               label="Semana"
               name="numeroSemana"
-              type="number"
+              select
               value={form.numeroSemana}
               onChange={handleChange}
-              disabled={Boolean(avanceInicial?.idAvance)}
-              inputProps={{ min: 1 }}
-            />
+              disabled={Boolean(avanceInicial?.idAvance) || opcionesSemana.length === 0}
+              helperText={
+                totalSemanasEnteras > 0
+                  ? `Semanas disponibles: 1 a ${totalSemanasEnteras}`
+                  : "Sin semanas disponibles"
+              }
+            >
+              {opcionesSemana.map((semana) => (
+                <MenuItem key={semana} value={semana}>
+                  Semana {semana}
+                </MenuItem>
+              ))}
+            </TextField>
           </Grid>
 
           <Grid item xs={12} md={9}>
@@ -317,10 +379,10 @@ const SeguimientoForm = ({
               fullWidth
               label="Porcentaje semana"
               name="porcentajeSemana"
-              type="number"
+              type="text"
               value={form.porcentajeSemana}
               onChange={handleChange}
-              inputProps={{ min: 0, max: 100 }}
+              inputProps={DECIMAL_INPUT_PROPS}
             />
           </Grid>
 

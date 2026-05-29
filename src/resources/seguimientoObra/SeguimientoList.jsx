@@ -94,6 +94,16 @@ const SeguimientoList = () => {
     cronogramaInfo?.nombre ||
     "";
 
+  const avanceGeneralCronograma = Number(cronogramaInfo?.avanceGeneral || 0);
+  const avanceGeneralRegistrado = Math.max(
+    0,
+    ...avances.map((avance) => Number(avance?.porcentajeGeneral || 0))
+  );
+  const estadoCronograma = String(cronogramaInfo?.estadoCronograma || "").toUpperCase();
+  const cronogramaFinalizado =
+    estadoCronograma === "FINALIZADO" &&
+    Math.max(avanceGeneralCronograma, avanceGeneralRegistrado) >= 100;
+
   useEffect(() => {
     if (idCronograma) {
       cargarAvances();
@@ -103,12 +113,12 @@ const SeguimientoList = () => {
   useEffect(() => {
     const nuevo = searchParams.get("nuevo");
 
-    if (nuevo === "1" && avances.length === 0 && puedeEditar) {
+    if (nuevo === "1" && avances.length === 0 && puedeEditar && !cronogramaFinalizado) {
       setMostrarForm(true);
       setAvanceEditar(null);
       setAvanceSeleccionado(null);
     }
-  }, [searchParams, avances, puedeEditar]);
+  }, [searchParams, avances, puedeEditar, cronogramaFinalizado]);
 
   useEffect(() => {
     const idAvance = Number(searchParams.get("avance"));
@@ -125,6 +135,10 @@ const SeguimientoList = () => {
   }, [searchParams, avances, loading]);
 
   const handleNuevo = () => {
+    if (cronogramaFinalizado) {
+      return;
+    }
+
     setAvanceEditar(null);
     setMostrarForm(true);
     setAvanceSeleccionado(null);
@@ -172,7 +186,11 @@ const SeguimientoList = () => {
 
         <Box display="flex" gap={2} flexWrap="wrap">
           {puedeEditar && (
-            <Button variant="contained" onClick={handleNuevo}>
+            <Button
+              variant="contained"
+              onClick={handleNuevo}
+              disabled={cronogramaFinalizado}
+            >
               Registrar avance
             </Button>
           )}
@@ -231,7 +249,7 @@ const SeguimientoList = () => {
 
                   <Box mt={2} display="flex" gap={1} flexWrap="wrap">
                     <Button
-                      variant="outlined"
+                      variant="contained"
                       onClick={() => setAvanceSeleccionado(avance)}
                     >
                       Ver detalle
@@ -239,7 +257,7 @@ const SeguimientoList = () => {
 
                     {puedeEditar && (
                       <Button
-                        variant="contained"
+                        variant="outlined"
                         onClick={() => handleEditar(avance)}
                       >
                         Editar

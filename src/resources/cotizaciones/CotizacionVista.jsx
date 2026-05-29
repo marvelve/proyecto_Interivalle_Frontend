@@ -41,6 +41,17 @@ const formatearNumero = (valor) => {
 
 const toNumber = (valor) => Number(valor || 0);
 
+const tienePrecioMaterialCero = (precio) => {
+  if (precio === null || precio === undefined || precio === "") {
+    return false;
+  }
+
+  return Number(precio) === 0;
+};
+
+const avisoMaterialesPropietarioTexto =
+  "LAS FILAS RESALTADAS EN AMARILLO CON VALOR CERO LAS PROVEE EL PROPIETARIO, DEBIDO A QUE ESTOS MATERIALES SON DEL GUSTO DEL CLIENTE";
+
 const formatearAreaPrivada = (valor) => {
   if (valor === null || valor === undefined || valor === "") return "-";
   return `${formatearNumero(valor)} m²`;
@@ -156,7 +167,7 @@ const estilos = {
     border: "1px solid #ccc",
     padding: "10px",
     background: "#f3f3f3",
-    textAlign: "left",
+    textAlign: "center",
     fontWeight: "bold",
   },
   td: {
@@ -164,6 +175,24 @@ const estilos = {
     padding: "10px",
     textAlign: "left",
     verticalAlign: "top",
+  },
+  tdMaterialPrecioCero: {
+    border: "1px solid #ccc",
+    padding: "10px",
+    textAlign: "left",
+    verticalAlign: "top",
+    background: "#fff59d",
+  },
+  avisoMaterialesPropietario: {
+    background: "#fff59d",
+    border: "1px solid #e6d94c",
+    borderRadius: "4px",
+    color: "#111",
+    fontSize: "13px",
+    fontWeight: "bold",
+    lineHeight: 1.4,
+    padding: "8px 12px",
+    textTransform: "uppercase",
   },
   resumenCard: {
     padding: "16px",
@@ -302,7 +331,7 @@ const calcularTotalesSemanaBase = (actividades = []) => {
       return {
         totalManoObra: totales.totalManoObra + totalActividad,
         totalMateriales: totales.totalMateriales + totalMateriales,
-        totalSemana: totales.totalSemana + totalActividad + totalMateriales,
+        totalSemana: totales.totalSemana + totalActividad,
       };
     },
     {
@@ -395,6 +424,9 @@ const renderTablaBasePdf = (filas) => {
       ? filas
           .map((fila) => {
             const celdas = [];
+            const claseMaterialPrecioCero = tienePrecioMaterialCero(fila.precioMaterial)
+              ? ' class="material-owner-cell"'
+              : "";
 
             if (fila.mostrarSemana) {
               celdas.push(
@@ -414,13 +446,19 @@ const renderTablaBasePdf = (filas) => {
               );
             }
 
-            celdas.push(renderCeldaPdf(fila.cantidad !== "" ? formatearNumero(fila.cantidad) : "-"));
-            celdas.push(renderCeldaPdf(fila.material || "-"));
+            celdas.push(
+              renderCeldaPdf(
+                fila.cantidad !== "" ? formatearNumero(fila.cantidad) : "-",
+                claseMaterialPrecioCero
+              )
+            );
+            celdas.push(renderCeldaPdf(fila.material || "-", claseMaterialPrecioCero));
             celdas.push(
               renderCeldaPdf(
                 fila.precioMaterial !== null
                   ? formatearMoneda(fila.precioMaterial)
-                  : "-"
+                  : "-",
+                claseMaterialPrecioCero
               )
             );
 
@@ -431,12 +469,15 @@ const renderTablaBasePdf = (filas) => {
 
   return `
     <section>
-      <h2>Detalle de la cotización base</h2>
+      <div class="section-title-row">
+        <h2>Detalle de la cotización base</h2>
+        <div class="material-owner-note">${escapeHtml(avisoMaterialesPropietarioTexto)}</div>
+      </div>
       <table>
         <thead>
           <tr>
             <th>Semana</th>
-            <th>Valor semana</th>
+            <th>Valor MANO OBRA semana</th>
             <th>Actividad</th>
             <th>Valor actividad</th>
             <th>Cantidad</th>
@@ -589,6 +630,32 @@ const construirHtmlCotizacionPdf = ({
           th {
             background: #f3f3f3;
             font-weight: 700;
+            text-align: center;
+          }
+          .material-owner-cell {
+            background: #fff59d !important;
+          }
+          .material-owner-note {
+            background: #fff59d !important;
+            border: 1px solid #e6d94c;
+            border-radius: 4px;
+            color: #111;
+            flex: 1;
+            font-size: 11px;
+            font-weight: 700;
+            line-height: 1.35;
+            padding: 7px 10px;
+            text-transform: uppercase;
+          }
+          .section-title-row {
+            align-items: center;
+            display: flex;
+            gap: 14px;
+            margin: 24px 0 10px;
+          }
+          .section-title-row h2 {
+            margin: 0;
+            white-space: nowrap;
           }
           .center { text-align: center; vertical-align: middle; }
           .strong { font-weight: 700; }
@@ -620,7 +687,7 @@ const construirHtmlCotizacionPdf = ({
           }
           .final-summary td:first-child { font-weight: 700; width: 55%; }
           @media print {
-            body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+            * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
           }
         </style>
       </head>
@@ -1047,12 +1114,14 @@ const CotizacionVista = () => {
     }
   };
 
+  // Datos de actividades adicionales asociados a la cotizacion base.
   const personalizada = cotizacion?.personalizada || null;
+  
   const adicionalesObraBlanca = personalizada?.obraBlanca || [];
   const adicionalesCarpinteria = personalizada?.carpinteria || [];
   const adicionalesVidrio = personalizada?.vidrio || [];
   const adicionalesMeson = personalizada?.mesonGranito || [];
-
+	   
   const detalles = useMemo(() => detallesBase(cotizacion), [cotizacion]);
 
   const detallesCarpinteria = useMemo(() => {
@@ -1158,6 +1227,12 @@ const CotizacionVista = () => {
     return obtenerServiciosSeleccionados(cotizacion, detalles);
   }, [cotizacion, detalles]);
 
+  const tieneServicioObraBlanca = useMemo(() => {
+    return serviciosSeleccionados.some((servicio) =>
+      normalizarTexto(servicio).includes("obra blanca")
+    );
+  }, [serviciosSeleccionados]);
+
   const totalCarpinteria = useMemo(() => {
     return detallesCarpinteria.reduce(
       (acc, item) => acc + toNumber(item?.subtotalVenta),
@@ -1187,7 +1262,9 @@ const CotizacionVista = () => {
     semanasFiltradas.forEach((semanaObj) => {
       totalManoObra += Number(semanaObj?.totalManoObra || 0);
       totalMateriales += Number(semanaObj?.totalMateriales || 0);
-      totalGeneral += Number(semanaObj?.totalSemana || 0);
+      totalGeneral +=
+        Number(semanaObj?.totalManoObra || 0) +
+        Number(semanaObj?.totalMateriales || 0);
     });
 
     return {
@@ -1211,14 +1288,33 @@ const CotizacionVista = () => {
     toNumber(cotizacion?.totalManoObra) +
     toNumber(cotizacion?.totalMateriales) +
     toNumber(cotizacion?.totalProductos);
-
   const totalAdicionalesMostrar = toNumber(cotizacion?.totalAdicionales);
+																		   
+									
+												 
+													  
+		 
+		
 
   const totalGeneralMostrar =
     toNumber(cotizacion?.totalGeneral) ||
     toNumber(cotizacion?.totalEstimado) ||
-    totalBaseMostrar + totalAdicionalesMostrar;
+										
+									 
+	  
+	  
+						  
+						   
+					  
+					 
+	 
 
+    totalBaseMostrar + totalAdicionalesMostrar;
+								 
+								 
+											   
+
+																		 
   const limpiarFiltros = () => {
     setFiltroSemana("");
     setFiltroActividad("");
@@ -1596,16 +1692,30 @@ const CotizacionVista = () => {
           </Grid>
         </Grid>
 
-        <Typography variant="h5" fontWeight="bold" mb={2}>
-          Detalle de la cotización base
-        </Typography>
+        <Box
+          display="flex"
+          alignItems="center"
+          gap={2}
+          flexWrap="wrap"
+          mb={2}
+        >
+          <Typography variant="h5" fontWeight="bold">
+            Detalle de la cotización base
+          </Typography>
+
+          {tieneServicioObraBlanca && (
+            <Box sx={estilos.avisoMaterialesPropietario}>
+              {avisoMaterialesPropietarioTexto}
+            </Box>
+          )}
+        </Box>
 
         <Box sx={{ overflowX: "auto" }}>
           <table style={estilos.tabla}>
             <thead>
               <tr>
                 <th style={estilos.th}>Semana</th>
-                <th style={estilos.th}>Valor semana</th>
+                <th style={estilos.th}>Valor MANO OBRA semana</th>
                 <th style={estilos.th}>Actividad</th>
                 <th style={estilos.th}>Valor actividad</th>
                 <th style={estilos.th}>Cantidad</th>
@@ -1615,51 +1725,58 @@ const CotizacionVista = () => {
             </thead>
             <tbody>
               {filasTabla.length > 0 ? (
-                filasTabla.map((fila, index) => (
-                  <tr key={index}>
-                    {fila.mostrarSemana && (
-                      <td style={estilos.tdSemana} rowSpan={fila.rowSpanSemana}>
-                        Semana {fila.semana}
+                filasTabla.map((fila, index) => {
+                  const estiloMaterial =
+                    tienePrecioMaterialCero(fila.precioMaterial)
+                      ? estilos.tdMaterialPrecioCero
+                      : estilos.td;
+
+                  return (
+                    <tr key={index}>
+                      {fila.mostrarSemana && (
+                        <td style={estilos.tdSemana} rowSpan={fila.rowSpanSemana}>
+                          Semana {fila.semana}
+                        </td>
+                      )}
+
+                      {fila.mostrarSemana && (
+                        <td style={estilos.tdSemana} rowSpan={fila.rowSpanSemana}>
+                          {formatearMoneda(fila.totalSemana)}
+                        </td>
+                      )}
+
+                      {fila.mostrarActividad && (
+                        <td
+                          style={estilos.tdActividad}
+                          rowSpan={fila.rowSpanActividad}
+                        >
+                          {fila.actividad}
+                        </td>
+                      )}
+
+                      {fila.mostrarActividad && (
+                        <td
+                          style={estilos.tdActividad}
+                          rowSpan={fila.rowSpanActividad}
+                        >
+                          {formatearMoneda(fila.precioActividad)}
+                        </td>
+                      )}
+
+                      <td style={estiloMaterial}>
+                        {fila.cantidad !== "" ? formatearNumero(fila.cantidad) : "-"}
                       </td>
-                    )}
 
-                    {fila.mostrarSemana && (
-                      <td style={estilos.tdSemana} rowSpan={fila.rowSpanSemana}>
-                        {formatearMoneda(fila.totalSemana)}
+                      <td style={estiloMaterial}>{fila.material || "-"}</td>
+
+                      <td style={estiloMaterial}>
+                        {fila.precioMaterial !== null
+                          ? formatearMoneda(fila.precioMaterial)
+                          : "-"}
                       </td>
-                    )}
-
-                    {fila.mostrarActividad && (
-                      <td
-                        style={estilos.tdActividad}
-                        rowSpan={fila.rowSpanActividad}
-                      >
-                        {fila.actividad}
-                      </td>
-                    )}
-
-                    {fila.mostrarActividad && (
-                      <td
-                        style={estilos.tdActividad}
-                        rowSpan={fila.rowSpanActividad}
-                      >
-                        {formatearMoneda(fila.precioActividad)}
-                      </td>
-                    )}
-
-                    <td style={estilos.td}>
-                      {fila.cantidad !== "" ? formatearNumero(fila.cantidad) : "-"}
-                    </td>
-
-                    <td style={estilos.td}>{fila.material || "-"}</td>
-
-                    <td style={estilos.td}>
-                      {fila.precioMaterial !== null
-                        ? formatearMoneda(fila.precioMaterial)
-                        : "-"}
-                    </td>
-                  </tr>
-                ))
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
                   <td style={estilos.td} colSpan="7">

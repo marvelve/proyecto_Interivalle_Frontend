@@ -2,14 +2,14 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   Box,
+  Button,
   Card,
   CardContent,
-  Typography,
+  Chip,
   Grid,
   TextField,
-  Button,
-  Chip,
-  Tooltip
+  Tooltip,
+  Typography,
 } from "@mui/material";
 import EventRepeatIcon from "@mui/icons-material/EventRepeat";
 import { useNotify } from "react-admin";
@@ -33,6 +33,14 @@ const estadoPendienteChipSx = {
   color: "#ef6c00",
   border: "1px solid #ffcc80",
 };
+
+const renderEstado = (estado) => (
+  <Chip
+    label={estado || "-"}
+    size="small"
+    sx={estado === "PENDIENTE" ? estadoPendienteChipSx : estadoSolicitudChipSx}
+  />
+);
 
 const SolicitudShow = () => {
   const { idSolicitud } = useParams();
@@ -81,15 +89,19 @@ const SolicitudShow = () => {
   const handleMarcarRealizada = async () => {
     try {
       setMarcandoRealizada(true);
-      const { json } = await httpClient(`${apiUrl}/api/solicitudes/${idSolicitud}/realizada`, {
-        method: "PUT",
-        headers: new Headers({
-          "Content-Type": "application/json"
-        })
-      });
+
+      const { json } = await httpClient(
+        `${apiUrl}/api/solicitudes/${idSolicitud}/realizada`,
+        {
+          method: "PUT",
+          headers: new Headers({
+            "Content-Type": "application/json",
+          }),
+        }
+      );
 
       notify("Visita técnica marcada como REALIZADA", {
-        type: "success"
+        type: "success",
       });
 
       setSolicitud(json);
@@ -115,13 +127,13 @@ const SolicitudShow = () => {
         {
           method: "PUT",
           headers: new Headers({
-            "Content-Type": "application/json"
-          })
+            "Content-Type": "application/json",
+          }),
         }
       );
 
-      notify("Visita tecnica confirmada y notificada al cliente", {
-        type: "success"
+      notify("Visita técnica confirmada y notificada al cliente", {
+        type: "success",
       });
 
       setSolicitud(json);
@@ -137,14 +149,6 @@ const SolicitudShow = () => {
       setConfirmando(false);
     }
   };
-
-  const renderEstado = (estado) => (
-    <Chip
-      label={estado || "-"}
-      size="small"
-      sx={estado === "PENDIENTE" ? estadoPendienteChipSx : estadoSolicitudChipSx}
-    />
-  );
 
   const renderServicios = () => {
     if (
@@ -182,6 +186,8 @@ const SolicitudShow = () => {
   const visitaPuedeRealizarse =
     visitaEditable ||
     solicitud?.estado === "CONFIRMADA";
+
+  // Permisos de acciones segun tipo de solicitud, rol y estado.
   const puedeConfirmarVisita =
     esVisitaTecnica && esSupervisor && visitaEditable;
   const puedeReprogramarVisita =
@@ -325,7 +331,7 @@ const SolicitudShow = () => {
                     height: 42,
                     padding: 0,
                     backgroundColor: "#2e7d32",
-                    "&:hover": { backgroundColor: "#1b5e20" }
+                    "&:hover": { backgroundColor: "#1b5e20" },
                   }}
                 >
                   <EventRepeatIcon />
@@ -351,7 +357,7 @@ const SolicitudShow = () => {
                 disabled={marcandoRealizada}
                 sx={{
                   backgroundColor: "#2e7d32",
-                  "&:hover": { backgroundColor: "#1b5e20" }
+                  "&:hover": { backgroundColor: "#1b5e20" },
                 }}
               >
                 {marcandoRealizada ? "Guardando..." : "Realizada"}

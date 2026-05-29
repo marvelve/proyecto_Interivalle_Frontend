@@ -1,33 +1,33 @@
 import * as React from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  Box,
+  Button,
   Card,
   CardContent,
-  Typography,
-  Box,
-  Grid,
-  TextField,
-  MenuItem,
-  FormControlLabel,
   Checkbox,
-  Button
+  FormControlLabel,
+  Grid,
+  MenuItem,
+  TextField,
+  Typography,
 } from "@mui/material";
 import { useNotify } from "react-admin";
 import httpClient, { apiUrl } from "../../app/httpClient";
 
-const serviciosDisponibles = [
+const SERVICIOS_DISPONIBLES = [
   { id: 1, nombre: "Mano de Obra" },
   { id: 2, nombre: "Carpintería" },
   { id: 3, nombre: "Divisiones en Vidrio" },
-  { id: 4, nombre: "Mesones en Mármol" }
+  { id: 4, nombre: "Mesones en Mármol" },
 ];
 
-const tiposSolicitud = [
+const TIPOS_SOLICITUD = [
   { value: "COTIZACION_BASE", label: "Cotización Base" },
-  { value: "VISITA_TECNICA", label: "Visita Técnica" }
+  { value: "VISITA_TECNICA", label: "Visita Técnica" },
 ];
 
-const horariosVisita = [
+const HORARIOS_VISITA = [
   { value: "08:00", label: "08:00 AM" },
   { value: "09:00", label: "09:00 AM" },
   { value: "10:00", label: "10:00 AM" },
@@ -36,8 +36,47 @@ const horariosVisita = [
   { value: "14:00", label: "02:00 PM" },
   { value: "15:00", label: "03:00 PM" },
   { value: "16:00", label: "04:00 PM" },
-  { value: "17:00", label: "05:00 PM" }
+  { value: "17:00", label: "05:00 PM" },
 ];
+
+const FORM_INICIAL = {
+  tipoSolicitud: "COTIZACION_BASE",
+  nombreProyecto: "",
+  fechaVisita: "",
+  horaVisita: "08:00",
+  direccionVisita: "",
+  celularCliente: "",
+};
+
+const limpiarDatosSolicitudLocal = () => {
+  localStorage.removeItem("idSolicitud");
+  localStorage.removeItem("serviciosSeleccionados");
+  localStorage.removeItem("tipoSolicitud");
+  localStorage.removeItem("nombreProyecto");
+  localStorage.removeItem("fechaVisita");
+  localStorage.removeItem("horaVisita");
+  localStorage.removeItem("direccionVisita");
+  localStorage.removeItem("celularCliente");
+};
+
+const obtenerFechaMinima = () => {
+  const hoy = new Date();
+  hoy.setDate(hoy.getDate() + 1);
+  return hoy.toISOString().split("T")[0];
+};
+
+const esFechaFutura = (fecha) => {
+  if (!fecha) return false;
+
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+
+  const fechaIngresada = new Date(`${fecha}T00:00:00`);
+  return fechaIngresada > hoy;
+};
+
+const validarHoraVisita = (hora) =>
+  HORARIOS_VISITA.some((item) => item.value === hora);
 
 const SolicitudCreate = () => {
   const navigate = useNavigate();
@@ -45,15 +84,7 @@ const SolicitudCreate = () => {
 
   const correoUsuario = localStorage.getItem("correoUsuario");
 
-  const [formData, setFormData] = React.useState({
-    tipoSolicitud: "COTIZACION_BASE",
-    nombreProyecto: "",
-    fechaVisita: "",
-    horaVisita: "08:00",
-    direccionVisita: "",
-    celularCliente: ""
-  });
-
+  const [formData, setFormData] = React.useState(FORM_INICIAL);
   const [serviciosSeleccionados, setServiciosSeleccionados] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
   const [idSolicitud, setIdSolicitud] = React.useState(null);
@@ -61,21 +92,8 @@ const SolicitudCreate = () => {
   const esVisitaTecnica = formData.tipoSolicitud === "VISITA_TECNICA";
 
   React.useEffect(() => {
-    localStorage.removeItem("idSolicitud");
-    localStorage.removeItem("serviciosSeleccionados");
-    localStorage.removeItem("tipoSolicitud");
-    localStorage.removeItem("nombreProyecto");
-    localStorage.removeItem("fechaVisita");
-    localStorage.removeItem("horaVisita");
-    localStorage.removeItem("direccionVisita");
-    localStorage.removeItem("celularCliente");
+    limpiarDatosSolicitudLocal();
   }, []);
-
-  const obtenerFechaMinima = () => {
-    const hoy = new Date();
-    hoy.setDate(hoy.getDate() + 1);
-    return hoy.toISOString().split("T")[0];
-  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -87,7 +105,7 @@ const SolicitudCreate = () => {
           ? value.toUpperCase()
           : name === "celularCliente"
           ? value.replace(/\D/g, "")
-          : value
+          : value,
     }));
   };
 
@@ -100,45 +118,21 @@ const SolicitudCreate = () => {
       fechaVisita: value === "VISITA_TECNICA" ? prev.fechaVisita : "",
       horaVisita: value === "VISITA_TECNICA" ? prev.horaVisita : "08:00",
       direccionVisita: value === "VISITA_TECNICA" ? prev.direccionVisita : "",
-      celularCliente: value === "VISITA_TECNICA" ? prev.celularCliente : ""
+      celularCliente: value === "VISITA_TECNICA" ? prev.celularCliente : "",
     }));
 
+    // Las visitas tecnicas no llevan servicios seleccionados.
     if (value === "VISITA_TECNICA") {
       setServiciosSeleccionados([]);
     }
   };
 
   const handleServicioChange = (id) => {
-    if (serviciosSeleccionados.includes(id)) {
-      setServiciosSeleccionados(serviciosSeleccionados.filter((s) => s !== id));
-    } else {
-      setServiciosSeleccionados([...serviciosSeleccionados, id]);
-    }
-  };
-
-  const esFechaFutura = (fecha) => {
-    if (!fecha) return false;
-
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
-
-    const fechaIngresada = new Date(fecha + "T00:00:00");
-    return fechaIngresada > hoy;
-  };
-
-  const validarHoraVisita = (hora) => {
-    const horasPermitidas = [
-      "08:00",
-      "09:00",
-      "10:00",
-      "11:00",
-      "12:00",
-      "14:00",
-      "15:00",
-      "16:00",
-      "17:00"
-    ];
-    return horasPermitidas.includes(hora);
+    setServiciosSeleccionados((prev) =>
+      prev.includes(id)
+        ? prev.filter((servicioId) => servicioId !== id)
+        : [...prev, id]
+    );
   };
 
   const validarFormulario = () => {
@@ -152,14 +146,14 @@ const SolicitudCreate = () => {
       return false;
     }
 
-    if (formData.tipoSolicitud === "COTIZACION_BASE") {
-      if (serviciosSeleccionados.length === 0) {
-        notify("Seleccione al menos un servicio", { type: "warning" });
-        return false;
-      }
+    // Cotizacion base requiere al menos un servicio.
+    if (formData.tipoSolicitud === "COTIZACION_BASE" && serviciosSeleccionados.length === 0) {
+      notify("Seleccione al menos un servicio", { type: "warning" });
+      return false;
     }
 
     if (formData.tipoSolicitud === "VISITA_TECNICA") {
+      // Visita tecnica requiere fecha futura, hora permitida y datos de contacto.
       if (!formData.fechaVisita) {
         notify("Ingrese la fecha de la visita técnica", { type: "warning" });
         return false;
@@ -177,7 +171,7 @@ const SolicitudCreate = () => {
 
       if (!validarHoraVisita(formData.horaVisita)) {
         notify("La hora debe estar entre 8 a 12 M o 2 a 5 PM", {
-          type: "warning"
+          type: "warning",
         });
         return false;
       }
@@ -194,7 +188,7 @@ const SolicitudCreate = () => {
 
       if (formData.celularCliente.length < 10) {
         notify("El número celular debe tener al menos 10 dígitos", {
-          type: "warning"
+          type: "warning",
         });
         return false;
       }
@@ -203,18 +197,16 @@ const SolicitudCreate = () => {
     return true;
   };
 
-  const construirPayload = () => {
-    return {
-      correoUsuario,
-      tipoSolicitud: formData.tipoSolicitud,
-      nombreProyecto: formData.nombreProyecto.trim(),
-      servicios: esVisitaTecnica ? [] : serviciosSeleccionados,
-      fechaVisita: esVisitaTecnica ? formData.fechaVisita : null,
-      horaVisita: esVisitaTecnica ? formData.horaVisita : null,
-      direccionVisita: esVisitaTecnica ? formData.direccionVisita.trim() : null,
-      celularCliente: esVisitaTecnica ? formData.celularCliente.trim() : null
-    };
-  };
+  const construirPayload = () => ({
+    correoUsuario,
+    tipoSolicitud: formData.tipoSolicitud,
+    nombreProyecto: formData.nombreProyecto.trim(),
+    servicios: esVisitaTecnica ? [] : serviciosSeleccionados,
+    fechaVisita: esVisitaTecnica ? formData.fechaVisita : null,
+    horaVisita: esVisitaTecnica ? formData.horaVisita : null,
+    direccionVisita: esVisitaTecnica ? formData.direccionVisita.trim() : null,
+    celularCliente: esVisitaTecnica ? formData.celularCliente.trim() : null,
+  });
 
   const guardarEnLocalStorage = (solicitudId) => {
     localStorage.setItem("idSolicitud", solicitudId);
@@ -236,17 +228,14 @@ const SolicitudCreate = () => {
   const crearNuevaSolicitud = async () => {
     const payload = construirPayload();
 
-    console.log("Payload solicitud:", payload);
-
+    // Envia la solicitud al backend. El token se agrega desde httpClient.
     const { json } = await httpClient(`${apiUrl}/api/solicitudes`, {
       method: "POST",
       body: JSON.stringify(payload),
       headers: new Headers({
-        "Content-Type": "application/json"
-      })
+        "Content-Type": "application/json",
+      }),
     });
-
-    console.log("Solicitud creada:", json);
 
     if (!json?.idSolicitud) {
       throw new Error("La solicitud se creó, pero no se recibió el idSolicitud");
@@ -295,13 +284,13 @@ const SolicitudCreate = () => {
 
       if (formData.tipoSolicitud === "COTIZACION_BASE") {
         notify("Solicitud creada correctamente. Estado: PENDIENTE", {
-          type: "success"
+          type: "success",
         });
 
         navigate("/cotizacion-base");
       } else {
         notify("Visita técnica creada correctamente", {
-          type: "success"
+          type: "success",
         });
 
         navigate("/solicitudes");
@@ -338,7 +327,7 @@ const SolicitudCreate = () => {
                   value={formData.tipoSolicitud}
                   onChange={handleTipoSolicitudChange}
                 >
-                  {tiposSolicitud.map((tipo) => (
+                  {TIPOS_SOLICITUD.map((tipo) => (
                     <MenuItem key={tipo.value} value={tipo.value}>
                       {tipo.label}
                     </MenuItem>
@@ -364,7 +353,7 @@ const SolicitudCreate = () => {
                 </Typography>
 
                 <Grid container>
-                  {serviciosDisponibles.map((servicio) => (
+                  {SERVICIOS_DISPONIBLES.map((servicio) => (
                     <Grid item xs={12} md={6} key={servicio.id}>
                       <FormControlLabel
                         control={
@@ -410,7 +399,7 @@ const SolicitudCreate = () => {
                       value={formData.horaVisita}
                       onChange={handleChange}
                     >
-                      {horariosVisita.map((hora) => (
+                      {HORARIOS_VISITA.map((hora) => (
                         <MenuItem key={hora.value} value={hora.value}>
                           {hora.label}
                         </MenuItem>
@@ -452,23 +441,23 @@ const SolicitudCreate = () => {
               </Button>
 
               {!esVisitaTecnica && (
-              <Button
-                variant="outlined"
-                onClick={handleGuardar}
-                disabled={loading}
-                sx={{
-                  bgcolor: "#ffffff",
-                  color: "#2e7d32",
-                  borderColor: "#2e7d32",
-                  "&:hover": {
-                    bgcolor: "#f7fbf7",
-                    borderColor: "#1b5e20"
-                  }
-                }}
-              >
-                {loading ? "Guardando..." : "Guardar"}
-              </Button>
-            )}
+                <Button
+                  variant="outlined"
+                  onClick={handleGuardar}
+                  disabled={loading}
+                  sx={{
+                    bgcolor: "#ffffff",
+                    color: "#2e7d32",
+                    borderColor: "#2e7d32",
+                    "&:hover": {
+                      bgcolor: "#f7fbf7",
+                      borderColor: "#1b5e20",
+                    },
+                  }}
+                >
+                  {loading ? "Guardando..." : "Guardar"}
+                </Button>
+              )}
 
               <Button
                 variant="contained"
@@ -476,7 +465,7 @@ const SolicitudCreate = () => {
                 disabled={loading}
                 sx={{
                   backgroundColor: "#2e7d32",
-                  "&:hover": { backgroundColor: "#1b5e20" }
+                  "&:hover": { backgroundColor: "#1b5e20" },
                 }}
               >
                 {loading

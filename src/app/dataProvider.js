@@ -289,7 +289,9 @@ getList: async (resource, params) => {
             String(item.nombreItem || "").toLowerCase().includes(q) ||
             String(item.categoria || "").toLowerCase().includes(q) ||
             String(item.tipoItem || "").toLowerCase().includes(q) ||
-            String(item.nombreServicio || "").toLowerCase().includes(q)
+            String(item.nombreServicio || "").toLowerCase().includes(q) ||
+            String(item.tablaOrigen || "").toLowerCase().includes(q) ||
+            String(item.idItemOrigen || "").toLowerCase().includes(q)
           );
         }
 

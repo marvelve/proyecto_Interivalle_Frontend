@@ -1,22 +1,25 @@
 import * as React from "react";
 import {
-  List,
   Datagrid,
-  TextField,
-  NumberField,
   EditButton,
   FunctionField,
-  TextInput,
+  List,
+  NumberField,
   SelectInput,
+  TextField,
+  TextInput,
 } from "react-admin";
 import { Chip } from "@mui/material";
 
+const formatearMoneda = (valor) =>
+  new Intl.NumberFormat("es-CO", {
+    style: "currency",
+    currency: "COP",
+    minimumFractionDigits: 0,
+  }).format(Number(valor || 0));
+
 const catalogoFilters = [
-  <TextInput
-    label="Buscar ítem"
-    source="q"
-    alwaysOn
-  />,
+  <TextInput label="Buscar ítem" source="q" alwaysOn />,
 
   <SelectInput
     label="Tipo"
@@ -29,27 +32,19 @@ const catalogoFilters = [
     alwaysOn
   />,
 
-  <TextInput
-    label="Categoría"
-    source="categoria"
-    alwaysOn
-  />,
-
-  <TextInput
-    label="Servicio"
-    source="nombreServicio"
-    alwaysOn
-  />,
+  <TextInput label="Categoría" source="categoria" alwaysOn />,
+  <TextInput label="Servicio" source="nombreServicio" alwaysOn />,
 ];
 
 const CatalogoItemList = () => (
   <List
-    title="Actualización de precios"
+    title="Actualización de precios V2"
     filters={catalogoFilters}
     perPage={10}
   >
     <Datagrid rowClick="edit" bulkActionButtons={false}>
-      <TextField source="idCatalogoItem" label="ID" />
+      <TextField source="idItemOrigen" label="ID" />
+      <TextField source="tablaOrigen" label="Tabla" />
       <TextField source="nombreServicio" label="Servicio" />
       <TextField source="tipoItem" label="Tipo" />
       <TextField source="categoria" label="Categoría" />
@@ -61,11 +56,16 @@ const CatalogoItemList = () => (
         options={{ style: "currency", currency: "COP" }}
       />
 
-      <NumberField
-        source="precioUnitarioProveedor"
+      <FunctionField
         label="Precio proveedor"
-        options={{ style: "currency", currency: "COP" }}
+        render={(record) =>
+          record?.precioUnitarioProveedor == null
+            ? "-"
+            : formatearMoneda(record.precioUnitarioProveedor)
+        }
       />
+
+      <TextField source="relacionesV2" label="Relaciones V2" />
 
       <FunctionField
         label="Activo"
