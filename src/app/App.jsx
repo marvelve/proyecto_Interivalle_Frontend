@@ -178,8 +178,8 @@ const App = () => {
 
         permissions === "1" ? (
           <Resource
-            key="catalogo-items"
-            name="catalogo-items"
+            key="catalogo-v2"
+            name="catalogo-v2"
             options={{ label: "Actualización de precios" }}
             list={CatalogoItemList}
             edit={CatalogoItemEdit}

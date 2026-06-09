@@ -205,6 +205,20 @@ const estilos = {
     flexDirection: "column",
     justifyContent: "center",
   },
+  resumenCardTotalGeneral: {
+    padding: "16px",
+    borderRadius: "10px",
+    background: "#bbf7d0",
+    border: "1px solid #0a8f08",
+    textAlign: "center",
+    minHeight: "100px",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    "& .MuiTypography-root": {
+      fontWeight: "bold",
+    },
+  },
   tdSemana: {
     border: "1px solid #ccc",
     padding: "10px",
@@ -366,6 +380,9 @@ const formatearCantidadUnidad = (item) => {
   return Number.isInteger(cantidad) ? `${cantidad}` : cantidad.toFixed(2);
 };
 
+const obtenerNombreProductoDetalle = (item) =>
+  item?.actividadMaterial || item?.nombreProducto || item?.descripcion || "-";
+
 const TablaDetalleProductos = ({ titulo, detalles, total, etiquetaTotal }) => (
   <>
     <Typography variant="h5" fontWeight="bold" mt={5} mb={2}>
@@ -386,7 +403,7 @@ const TablaDetalleProductos = ({ titulo, detalles, total, etiquetaTotal }) => (
             <tr key={item.idDetalle || index}>
               <td style={estilos.td}>{formatearCantidadUnidad(item)}</td>
               <td style={estilos.td}>
-                {item.descripcion || item.actividadMaterial || "-"}
+                {obtenerNombreProductoDetalle(item)}
               </td>
               <td style={estilos.td}>{formatearMoneda(item.subtotalVenta)}</td>
             </tr>
@@ -499,7 +516,7 @@ const renderTablaProductosPdf = (titulo, detalles, total, etiquetaTotal) => {
       (item) => `
         <tr>
           ${renderCeldaPdf(formatearCantidadUnidad(item))}
-          ${renderCeldaPdf(item.descripcion || item.actividadMaterial || "-")}
+          ${renderCeldaPdf(obtenerNombreProductoDetalle(item))}
           ${renderCeldaPdf(formatearMoneda(item.subtotalVenta))}
         </tr>
       `
@@ -678,6 +695,15 @@ const construirHtmlCotizacionPdf = ({
             padding: 10px;
             text-align: center;
           }
+          .summary-card-total-general {
+            background: #bbf7d0 !important;
+            border: 1px solid #0a8f08 !important;
+            font-weight: 700;
+          }
+          .summary-card-total-general .summary-label,
+          .summary-card-total-general .summary-value {
+            font-weight: 700;
+          }
           .summary-label { font-size: 11px; margin-bottom: 6px; }
           .summary-value { font-size: 15px; font-weight: 700; }
           .total-row td { font-weight: 700; }
@@ -704,7 +730,7 @@ const construirHtmlCotizacionPdf = ({
           ${resumen
             .map(
               ([label, value]) => `
-                <div class="summary-card">
+                <div class="summary-card${label === "Total General" ? " summary-card-total-general" : ""}">
                   <div class="summary-label">${escapeHtml(label)}</div>
                   <div class="summary-value">${escapeHtml(formatearMoneda(value))}</div>
                 </div>
@@ -731,7 +757,6 @@ const construirHtmlCotizacionPdf = ({
                   { titulo: "Medida", valor: (item) => formatearNumero(item.medida) },
                   { titulo: "Precio Unitario", valor: (item) => formatearMoneda(item.precioUnitario) },
                   { titulo: "Subtotal", valor: (item) => formatearMoneda(item.subtotal) },
-                  { titulo: "Descripción", valor: (item) => item.descripcion || "-" },
                 ], adicionalesObraBlanca, "No hay actividades adicionales de Obra Blanca.")}
                 ${renderTablaAdicionalesPdf("Carpintería adicional", [
                   { titulo: "Tipo mueble", valor: (item) => item.tipoMueble || "-" },
@@ -742,21 +767,18 @@ const construirHtmlCotizacionPdf = ({
                   { titulo: "Alto", valor: (item) => formatearNumero(item.alto) },
                   { titulo: "Precio Unitario", valor: (item) => formatearMoneda(item.precioUnitario) },
                   { titulo: "Subtotal", valor: (item) => formatearMoneda(item.subtotal) },
-                  { titulo: "Descripción", valor: (item) => item.descripcion || "-" },
                 ], adicionalesCarpinteria, "No hay carpintería adicional.")}
                 ${renderTablaAdicionalesPdf("Vidrio adicional", [
                   { titulo: "Tipo vidrio", valor: (item) => item.tipoVidrio || "-" },
                   { titulo: "Cantidad", valor: (item) => item.cantidad ?? "-" },
                   { titulo: "Precio Unitario", valor: (item) => formatearMoneda(item.precioUnitario) },
                   { titulo: "Subtotal", valor: (item) => formatearMoneda(item.subtotal) },
-                  { titulo: "Descripción", valor: (item) => item.descripcion || "-" },
                 ], adicionalesVidrio, "No hay vidrio adicional.")}
                 ${renderTablaAdicionalesPdf("Mesón granito adicional", [
                   { titulo: "Tipo granito", valor: (item) => item.tipoGranito || "-" },
                   { titulo: "Cantidad", valor: (item) => item.cantidad ?? "-" },
                   { titulo: "Precio Unitario", valor: (item) => formatearMoneda(item.precioUnitario) },
                   { titulo: "Subtotal", valor: (item) => formatearMoneda(item.subtotal) },
-                  { titulo: "Descripción", valor: (item) => item.descripcion || "-" },
                 ], adicionalesMeson, "No hay mesón granito adicional.")}
               `
               : "<p>No hay actividades adicionales registradas.</p>"
@@ -876,6 +898,7 @@ const CotizacionVista = () => {
 
   const idRol = Number(localStorage.getItem("idRol"));
   const esCliente = idRol === 3;
+  const puedeGestionarCotizacion = idRol === 1 || idRol === 2 || idRol === 3;
 
   useEffect(() => {
     cargarCotizacion();
@@ -1056,8 +1079,8 @@ const CotizacionVista = () => {
 
   const handleAprobar = async () => {
     try {
-      if (!esCliente) {
-        notify("Solo el cliente puede aprobar la cotización", {
+      if (!puedeGestionarCotizacion) {
+        notify("No tienes permisos para aprobar la cotización", {
           type: "warning",
         });
         return;
@@ -1088,7 +1111,9 @@ const CotizacionVista = () => {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          mensaje: "Aprobada por el cliente",
+          mensaje: esCliente
+            ? "Aprobada por el cliente"
+            : "Aprobada por usuario interno",
           fechaInicio: fechaInicio,
         }),
       }).then(async (res) => {
@@ -1559,7 +1584,7 @@ const CotizacionVista = () => {
           </Grid>
 
           <Grid item xs={12} sm={6} md={3}>
-            <Box sx={estilos.resumenCard}>
+            <Box sx={estilos.resumenCardTotalGeneral}>
               <Typography variant="subtitle2">Total General</Typography>
               <Typography variant="h6">
                 {formatearMoneda(totalGeneralMostrar)}
@@ -1569,7 +1594,7 @@ const CotizacionVista = () => {
         </Grid>
 
         <Box display="flex" gap={2} flexWrap="wrap" mb={3}>
-          {esCliente && (
+          {puedeGestionarCotizacion && (
             <Button
               variant="contained"
               color="success"
@@ -1672,7 +1697,7 @@ const CotizacionVista = () => {
               VOLVER/EDITAR
             </Button>
 
-            {esCliente && (
+            {puedeGestionarCotizacion && (
               <Button
                 variant="contained"
                 color="success"
@@ -1843,7 +1868,6 @@ const CotizacionVista = () => {
                         <th style={estilos.th}>Medida</th>
                         <th style={estilos.th}>Precio Unitario</th>
                         <th style={estilos.th}>Subtotal</th>
-                        <th style={estilos.th}>Descripción</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1860,7 +1884,6 @@ const CotizacionVista = () => {
                           <td style={estilos.td}>
                             {formatearMoneda(item.subtotal)}
                           </td>
-                          <td style={estilos.td}>{item.descripcion || "-"}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1886,7 +1909,6 @@ const CotizacionVista = () => {
                         <th style={estilos.th}>Alto</th>
                         <th style={estilos.th}>Precio Unitario</th>
                         <th style={estilos.th}>Subtotal</th>
-                        <th style={estilos.th}>Descripción</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1900,7 +1922,6 @@ const CotizacionVista = () => {
                           <td style={estilos.td}>{formatearNumero(item.alto)}</td>
                           <td style={estilos.td}>{formatearMoneda(item.precioUnitario)}</td>
                           <td style={estilos.td}>{formatearMoneda(item.subtotal)}</td>
-                          <td style={estilos.td}>{item.descripcion || "-"}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1922,7 +1943,6 @@ const CotizacionVista = () => {
                         <th style={estilos.th}>Cantidad</th>
                         <th style={estilos.th}>Precio Unitario</th>
                         <th style={estilos.th}>Subtotal</th>
-                        <th style={estilos.th}>Descripción</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1932,7 +1952,6 @@ const CotizacionVista = () => {
                       <td style={estilos.td}>{item.cantidad ?? "-"}</td>
                       <td style={estilos.td}>{formatearMoneda(item.precioUnitario)}</td>
                       <td style={estilos.td}>{formatearMoneda(item.subtotal)}</td>
-                      <td style={estilos.td}>{item.descripcion || "-"}</td>
                     </tr>
                       ))}
                     </tbody>
@@ -1954,7 +1973,6 @@ const CotizacionVista = () => {
                         <th style={estilos.th}>Cantidad</th>
                         <th style={estilos.th}>Precio Unitario</th>
                         <th style={estilos.th}>Subtotal</th>
-                        <th style={estilos.th}>Descripción</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1964,7 +1982,6 @@ const CotizacionVista = () => {
                       <td style={estilos.td}>{item.cantidad ?? "-"}</td>
                       <td style={estilos.td}>{formatearMoneda(item.precioUnitario)}</td>
                       <td style={estilos.td}>{formatearMoneda(item.subtotal)}</td>
-                      <td style={estilos.td}>{item.descripcion || "-"}</td>
                     </tr>
                       ))}
                     </tbody>
@@ -2031,7 +2048,7 @@ const CotizacionVista = () => {
           </Paper>
         </Box>
 
-        {esCliente && (
+        {puedeGestionarCotizacion && (
           <Dialog
             open={openAprobar}
             onClose={() => setOpenAprobar(false)}

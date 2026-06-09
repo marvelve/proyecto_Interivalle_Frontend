@@ -24,10 +24,13 @@ const toEnteroNoNegativo = (valor) => {
   return Number.isNaN(numero) || numero < 0 ? 0 : numero;
 };
 
-const opcionesCantidadBanosObraBlanca = ["0", "1", "2"];
+const opcionesCantidadBanosObraBlanca = ["0", "1", "2", "3", "4"];
 
 const limitarCantidadBanosObraBlanca = (valor) =>
-  Math.min(2, toEnteroNoNegativo(valor));
+  Math.min(4, toEnteroNoNegativo(valor));
+
+const limitarCantidadBanosCarpinteria = (valor) =>
+  Math.min(4, toEnteroNoNegativo(valor));
 
 const toNumeroNoNegativo = (valor) => {
   const numero = Number.parseFloat(valor);
@@ -65,7 +68,7 @@ const crearOpcionesMueblesBano = (cantidadBanos) => {
 
 const crearSeleccionMueblesBano = (cantidadBanos, seleccionActual = {}) => {
   return crearOpcionesMueblesBano(cantidadBanos).reduce((seleccion, opcion) => {
-    seleccion[opcion.id] = seleccionActual[opcion.id] ?? true;
+    seleccion[opcion.id] = seleccionActual[opcion.id] ?? false;
     return seleccion;
   }, {});
 };
@@ -354,13 +357,16 @@ const CotizacionBase = () => {
 
   const handleChangeCarpinteria = (e) => {
     const { name, value } = e.target;
+    const nuevoValor =
+      name === "cantidadBanos" ? String(limitarCantidadBanosCarpinteria(value)) : value;
+
     setFormDataCarpinteria((prev) => ({
       ...prev,
-      [name]: value,
+      [name]: nuevoValor,
       ...(name === "cantidadBanos"
         ? {
             mueblesBanoSeleccionados: crearSeleccionMueblesBano(
-              value,
+              nuevoValor,
               prev.mueblesBanoSeleccionados
             ),
           }
@@ -676,7 +682,7 @@ const CotizacionBase = () => {
               <Grid item xs={12} md={3}>
                 <TextField
                   fullWidth
-                  label="Medida(MT) área privada"
+                  label="Medida(MT) Apartamento"
                   name="medidaAreaPrivada"
                   value={formDataManoObra.medidaAreaPrivada}
                   onChange={handleChangeManoObra}
@@ -799,7 +805,7 @@ const CotizacionBase = () => {
               <Grid item xs={12} md={4}>
                 <TextField
                   fullWidth
-                  label="Medida Mueble alto cocina (MT)"
+                  label="Medida(MT) Mueble alto cocina"
                   name="muebleAltoCocina"
                   value={formDataCarpinteria.muebleAltoCocina}
                   onChange={handleChangeCarpinteria}
@@ -811,7 +817,7 @@ const CotizacionBase = () => {
               <Grid item xs={12} md={4}>
                 <TextField
                   fullWidth
-                  label="Medida Mueble bajo cocina (MT)"
+                  label="Medida(MT) Mueble bajo cocina"
                   name="muebleBajoCocina"
                   value={formDataCarpinteria.muebleBajoCocina}
                   onChange={handleChangeCarpinteria}
@@ -823,7 +829,7 @@ const CotizacionBase = () => {
               <Grid item xs={12} md={4}>
                 <TextField
                   fullWidth
-                  label="Medida Mueble barra (MT)"
+                  label="Medida(MT) Mueble barra"
                   name="muebleBarra"
                   value={formDataCarpinteria.muebleBarra}
                   onChange={handleChangeCarpinteria}
@@ -832,21 +838,22 @@ const CotizacionBase = () => {
                 />
               </Grid>
 
-              <Grid item xs={12} md={4}>
+              <Grid item xs={12} md={4} sx={{ minWidth: 220, flex: "0 0 220px" }}>
                 <TextField
                   fullWidth
-                  label="Cantidad Mueble baños"
+                  label="Cantidad muebles de baño"
                   name="cantidadBanos"
                   value={formDataCarpinteria.cantidadBanos}
                   onChange={handleChangeCarpinteria}
                   type="number"
-                  inputProps={{ min: 0, step: 1 }}
+                  inputProps={{ min: 0, max: 4, step: 1 }}
+                  InputLabelProps={{ shrink: true }}
                   variant="standard"
                 />
               </Grid>
 
               {mostrarOpcionesMueblesBano && (
-                <Grid item xs={12}>
+                <Grid item xs={12} sx={{ flexBasis: "100%", width: "100%" }}>
                   <Typography variant="subtitle1" fontWeight="bold" sx={{ mt: 1 }}>
                     Muebles lavamanos para baños
                   </Typography>
@@ -910,7 +917,7 @@ const CotizacionBase = () => {
               <Box>
                 <TextField
                   fullWidth
-                  label="Cantidad baños"
+                  label="Cantidad divisiones Vidrio baños"
                   name="cantidadBanos"
                   value={formDataVidrio.cantidadBanos}
                   onChange={handleChangeVidrio}
@@ -966,7 +973,7 @@ const CotizacionBase = () => {
                       name="tieneNicho"
                     />
                   }
-                  label="¿Con Caja de Nicho?"
+                  label="¿Vidrio con Caja de Nicho?"
                 />
               </Box>
             </Box>

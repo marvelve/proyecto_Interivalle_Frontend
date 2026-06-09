@@ -37,6 +37,8 @@ const FormObraBlanca = ({
   errors = [],
   titulo = "Formulario Mano de Obra / Obra Blanca",
   disabled = false,
+  puedeEliminarGuardadas = false,
+  onEliminarGuardada,
 }) => {
   const [touched, setTouched] = useState({});
   const [intentoAgregar, setIntentoAgregar] = useState(false);
@@ -274,7 +276,13 @@ const FormObraBlanca = ({
   };
 
   const eliminarActividad = (index) => {
-    if (disabled || actividades[index]?.yaGuardada) return;
+    if (disabled) return;
+
+    if (actividades[index]?.yaGuardada) {
+      if (!puedeEliminarGuardadas || !onEliminarGuardada) return;
+      onEliminarGuardada(index, actividades[index]);
+      return;
+    }
 
     if (actividades.length === 1) {
       actualizarActividades([crearActividadVacia()]);
@@ -301,6 +309,8 @@ const FormObraBlanca = ({
 
       {actividades.map((item, index) => {
         const filaDeshabilitada = disabled || item.yaGuardada;
+        const puedeEliminarFila =
+          !disabled && (!item.yaGuardada || puedeEliminarGuardadas);
 
         return (
           <Card
@@ -456,33 +466,49 @@ const FormObraBlanca = ({
                   />
                 </Grid>
 
-                <Grid item xs={12} md={3}>
+                <Grid item xs={12} sm={6} md={3}>
                   <Button
                     variant="outlined"
                     color="error"
                     onClick={() => eliminarActividad(index)}
-                    disabled={filaDeshabilitada}
+                    disabled={!puedeEliminarFila}
                     fullWidth
                     sx={{ height: "56px" }}
                   >
                     ELIMINAR ACTIVIDAD
                   </Button>
                 </Grid>
+
+                <Grid item xs={12} sm={6} md={3}>
+                  <Button
+                    variant="contained"
+                    onClick={agregarActividad}
+                    disabled={disabled}
+                    fullWidth
+                    sx={{ height: "56px" }}
+                  >
+                    AGREGAR OTRA ACTIVIDAD
+                  </Button>
+                </Grid>
               </Grid>
+
+              {index === actividades.length - 1 && (
+                <Box
+                  sx={{
+                    mt: 3,
+                    pt: 2,
+                    borderTop: "1px solid #e0e0e0",
+                  }}
+                >
+                  <Typography variant="h6">
+                    Total Actividades: {totalGeneral}
+                  </Typography>
+                </Box>
+              )}
             </CardContent>
           </Card>
         );
       })}
-
-      <Box sx={{ display: "flex", gap: 2, mt: 2, mb: 3 }}>
-        <Button variant="contained" onClick={agregarActividad} disabled={disabled}>
-          AGREGAR OTRA ACTIVIDAD
-        </Button>
-      </Box>
-
-      <Box sx={{ mt: 2 }}>
-        <Typography variant="h6">Total Actividades: {totalGeneral}</Typography>
-      </Box>
     </Box>
   );
 };

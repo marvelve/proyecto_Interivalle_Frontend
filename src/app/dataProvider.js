@@ -36,8 +36,10 @@ const defaultSortFieldByResource = {
   solicitudes: "idSolicitud",
   cotizaciones: "idCotizacion",
   cronogramas: "idCronograma",
-  "catalogo-items": "idCatalogoItem",
+  "catalogo-v2": "idCatalogoItem",
 };
+
+const esCatalogoV2 = (resource) => resource === "catalogo-v2";
 
 const applySortAndPagination = (json, params = {}, resource) => {
   let data = mapIdField(Array.isArray(json) ? json : []);
@@ -275,7 +277,7 @@ getList: async (resource, params) => {
       return applySortAndPagination(data, params, resource);
     }
 
-    if (resource === "catalogo-items") {
+    if (esCatalogoV2(resource)) {
         const { json } = await httpClient(`${apiUrl}/api/catalogo-items`);
 
         let data = mapIdField(json);
@@ -340,6 +342,13 @@ getOne: async (resource, params) => {
     data: mapIdField(json),
   };
 }
+  if (esCatalogoV2(resource)) {
+    const { json } = await httpClient(`${apiUrl}/api/catalogo-items/${params.id}`);
+
+    return {
+      data: mapIdField(json),
+    };
+  }
   const response = await baseDataProvider.getOne(resource, params);
   return {
     ...response,
@@ -365,7 +374,7 @@ getOne: async (resource, params) => {
 
 
   create: async (resource, params) => {
-  if (resource === "catalogo-items") {
+  if (esCatalogoV2(resource)) {
     const { json } = await httpClient(
       `${apiUrl}/api/catalogo-items`,
       {
@@ -389,7 +398,7 @@ getOne: async (resource, params) => {
 
 
     update: async (resource, params) => {
-      if (resource === "catalogo-items") {
+      if (esCatalogoV2(resource)) {
         const { json } = await httpClient(
           `${apiUrl}/api/catalogo-items/${params.id}/precio`,
           {

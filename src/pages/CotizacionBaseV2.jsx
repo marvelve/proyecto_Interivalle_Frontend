@@ -68,10 +68,13 @@ const toEnteroNoNegativo = (valor) => {
   return Number.isNaN(numero) || numero < 0 ? 0 : numero;
 };
 
-const opcionesCantidadBanosObraBlanca = ["0", "1", "2"];
+const opcionesCantidadBanosObraBlanca = ["0", "1", "2", "3", "4"];
 
 const limitarCantidadBanosObraBlanca = (valor) =>
-  Math.min(2, toEnteroNoNegativo(valor));
+  Math.min(4, toEnteroNoNegativo(valor));
+
+const limitarCantidadBanosCarpinteria = (valor) =>
+  Math.min(4, toEnteroNoNegativo(valor));
 
 const toNumeroNoNegativo = (valor) => {
   const numero = Number(normalizarDecimal(valor));
@@ -121,7 +124,7 @@ const crearOpcionesMueblesBano = (cantidadBanos) => {
 
 const crearSeleccionMueblesBano = (cantidadBanos, seleccionActual = {}) =>
   crearOpcionesMueblesBano(cantidadBanos).reduce((seleccion, opcion) => {
-    seleccion[opcion.id] = seleccionActual[opcion.id] ?? true;
+    seleccion[opcion.id] = seleccionActual[opcion.id] ?? false;
     return seleccion;
   }, {});
 
@@ -517,13 +520,16 @@ const CotizacionBaseV2 = () => {
 
   const handleChangeCarpinteria = (event) => {
     const { name, value } = event.target;
+    const nuevoValor =
+      name === "cantidadBanos" ? String(limitarCantidadBanosCarpinteria(value)) : value;
+
     setFormDataCarpinteria((prev) => ({
       ...prev,
-      [name]: value,
+      [name]: nuevoValor,
       ...(name === "cantidadBanos"
         ? {
             mueblesBanoSeleccionados: crearSeleccionMueblesBano(
-              value,
+              nuevoValor,
               prev.mueblesBanoSeleccionados
             ),
           }
@@ -592,8 +598,8 @@ const CotizacionBaseV2 = () => {
         return false;
       }
 
-      if (limitarCantidadBanosObraBlanca(formDataManoObra.cantidadBanos) > 2) {
-        notify("La cantidad de banos de Obra Blanca solo puede ser 0, 1 o 2.", {
+      if (limitarCantidadBanosObraBlanca(formDataManoObra.cantidadBanos) > 4) {
+        notify("La cantidad de banos de Obra Blanca solo puede ser 0, 1, 2, 3 o 4.", {
           type: "warning",
         });
         return false;
@@ -1088,21 +1094,22 @@ const CotizacionBaseV2 = () => {
                 />
               </Grid>
 
-              <Grid item xs={12} md={4}>
+              <Grid item xs={12} md={4} sx={{ minWidth: 220, flex: "0 0 220px" }}>
                 <TextField
                   fullWidth
-                  label="Cantidad banos con mueble"
+                  label="Cantidad muebles de bano"
                   name="cantidadBanos"
                   value={formDataCarpinteria.cantidadBanos}
                   onChange={handleChangeCarpinteria}
                   type="number"
-                  inputProps={{ min: 0, step: 1 }}
+                  inputProps={{ min: 0, max: 4, step: 1 }}
+                  InputLabelProps={{ shrink: true }}
                   variant="standard"
                 />
               </Grid>
 
               {opcionesMueblesBano.length > 0 && (
-                <Grid item xs={12}>
+                <Grid item xs={12} sx={{ flexBasis: "100%", width: "100%" }}>
                   <Box display="flex" gap={2} flexWrap="wrap">
                     {opcionesMueblesBano.map((opcion) => (
                       <FormControlLabel

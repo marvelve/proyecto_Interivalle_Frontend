@@ -78,6 +78,9 @@ const obtenerServiciosDeSolicitud = (data) => {
 const esCotizacionCerrada = (estado) =>
   ["APROBADA", "RECHAZADA"].includes((estado || "").toString().toUpperCase());
 
+const esCotizacionGenerada = (estado) =>
+  (estado || "").toString().toUpperCase() === "GENERADA";
+
 const normalizarDecimal = (value) =>
   String(value ?? "").trim().replace(",", ".");
 
@@ -147,6 +150,7 @@ const FormulariosCotizacionPersonalizada = () => {
   const [carpinteria, setCarpinteria] = useState([crearActividadVacia()]);
   const [vidrio, setVidrio] = useState([crearActividadVacia()]);
   const [meson, setMeson] = useState([crearActividadVacia()]);
+  const [huboEliminacion, setHuboEliminacion] = useState(false);
   const [errores, setErrores] = useState({
     1: [{}],
     2: [{}],
@@ -175,6 +179,8 @@ const FormulariosCotizacionPersonalizada = () => {
   }, [serviciosSeleccionados]);
 
   const cotizacionCerrada = esCotizacionCerrada(cotizacion?.estado);
+  const puedeEliminarActividadesGuardadas =
+    esCotizacionGenerada(cotizacion?.estado) && !guardando;
 
 const actividadesPorServicio = useMemo(() => {
     const pertenece = (item, idServicio) => {
@@ -292,9 +298,10 @@ const actividadesPorServicio = useMemo(() => {
         setIdCotizacionPersonalizada(json.idCotizacionPersonalizada);
       }
 
-      const actividadesObra = Array.isArray(json?.obraBlanca)
-        ? json.obraBlanca
-        : [];
+      const actividadesObra = Array.isArray(json?.obraBlanca) ? json.obraBlanca : [];
+      const actividadesCarpinteria = Array.isArray(json?.carpinteria) ? json.carpinteria : [];
+      const actividadesVidrio = Array.isArray(json?.vidrio) ? json.vidrio : [];
+      const actividadesMeson = Array.isArray(json?.mesonGranito) ? json.mesonGranito : [];
 
       if (actividadesObra.length > 0) {
         setObraBlanca([
@@ -313,6 +320,27 @@ const actividadesPorServicio = useMemo(() => {
           crearActividadVacia(),
         ]);
       }
+
+      if (actividadesCarpinteria.length > 0) {
+        setCarpinteria([
+          ...actividadesCarpinteria.map((item) => mapearProductoGuardado(item, "idCarpinteria", item.tipoMueble, item.material)),
+          crearActividadVacia(),
+        ]);
+      }
+
+      if (actividadesVidrio.length > 0) {
+        setVidrio([
+          ...actividadesVidrio.map((item) => mapearProductoGuardado(item, "idVidrio", item.tipoVidrio, "")),
+          crearActividadVacia(),
+        ]);
+      }
+
+      if (actividadesMeson.length > 0) {
+        setMeson([
+          ...actividadesMeson.map((item) => mapearProductoGuardado(item, "idMeson", item.tipoGranito, "")),
+          crearActividadVacia(),
+        ]);
+      }
     } catch (error) {
       const mensaje = error?.body?.message || error?.message || "";
       if (!mensaje.includes("No existe cotización personalizada")) {
@@ -320,6 +348,19 @@ const actividadesPorServicio = useMemo(() => {
       }
     }
   };
+
+  const mapearProductoGuardado = (item, idField, descripcion, lugar) => ({
+    [idField]: item[idField] || null,
+    idActividad: item.idActividad || "",
+    lugar: lugar || item.descripcion || "",
+    cantidad: item.cantidad ?? "",
+    medida: item.largo ?? item.ancho ?? "",
+    tipoCobro: item.unidad || "",
+    precioUnitario: item.precioUnitario ?? "",
+    descripcion: item.descripcion || descripcion || "",
+    subtotal: item.subtotal ?? 0,
+    yaGuardada: true,
+  });
 
   const actividadSeleccionada = (idServicio, idActividad) => {
     return (actividadesPorServicio[idServicio] || []).find(
@@ -348,6 +389,19 @@ const actividadesPorServicio = useMemo(() => {
     return nuevosConDatos.every(filaEsValida);
   };
 
+  const hayActividadesNuevas = () => {
+    const formularios = {
+      1: obraBlanca,
+      2: carpinteria,
+      3: vidrio,
+      4: meson,
+    };
+
+    return serviciosIds.some((idServicio) =>
+      (formularios[idServicio] || []).some(filaTieneDatos)
+    );
+  };
+
   const validarTodosLosFormularios = () => {
     const formularios = {
       1: obraBlanca,
@@ -366,7 +420,7 @@ const actividadesPorServicio = useMemo(() => {
       if (!validarFormularioServicio(idServicio, items)) todoValido = false;
     });
 
-    if (!hayActividadNueva) {
+    if (!hayActividadNueva && !huboEliminacion && !idCotizacionPersonalizada) {
       notify("Debes adicionar al menos una actividad nueva", { type: "warning" });
       return false;
     }
@@ -543,6 +597,70 @@ const actividadesPorServicio = useMemo(() => {
     );
   };
 
+  const quitarFilaGuardada = (idServicio, index) => {
+    const setters = {
+      1: setObraBlanca,
+      2: setCarpinteria,
+      3: setVidrio,
+      4: setMeson,
+    };
+
+    const setter = setters[idServicio];
+    if (!setter) return;
+
+    setter((prev) => {
+      const filas = prev.filter((_, i) => i !== index);
+      return filas.length > 0 ? filas : [crearActividadVacia()];
+    });
+  };
+
+  const obtenerEndpointEliminar = (idServicio, item) => {
+    if (idServicio === 1 && item?.idObraBlanca) {
+      return `${apiUrl}/api/obra-blanca/${item.idObraBlanca}`;
+    }
+    if (idServicio === 2 && item?.idCarpinteria) {
+      return `${apiUrl}/api/carpinteria/${item.idCarpinteria}`;
+    }
+    if (idServicio === 3 && item?.idVidrio) {
+      return `${apiUrl}/api/vidrio/${item.idVidrio}`;
+    }
+    if (idServicio === 4 && item?.idMeson) {
+      return `${apiUrl}/api/meson-granito/${item.idMeson}`;
+    }
+    return null;
+  };
+
+  const eliminarActividadGuardada = async (idServicio, index, item) => {
+    if (!puedeEliminarActividadesGuardadas) return;
+
+    const endpoint = obtenerEndpointEliminar(idServicio, item);
+    if (!endpoint) {
+      notify("No se pudo identificar la actividad a eliminar", { type: "warning" });
+      return;
+    }
+
+    try {
+      setGuardando(true);
+      await httpClient(endpoint, { method: "DELETE" });
+
+      if (idCotizacionPersonalizada) {
+        await recalcularCotizacion(idCotizacionPersonalizada);
+      }
+
+      quitarFilaGuardada(idServicio, index);
+      setHuboEliminacion(true);
+      notify("Actividad eliminada correctamente", { type: "success" });
+    } catch (error) {
+      console.error(error);
+      notify(
+        error?.body?.message || error?.message || "No fue posible eliminar la actividad",
+        { type: "error" }
+      );
+    } finally {
+      setGuardando(false);
+    }
+  };
+
   const handleGenerarYVer = async () => {
     if (cotizacionCerrada) {
       notify("La cotización ya no permite adicionar actividades", {
@@ -556,10 +674,17 @@ const actividadesPorServicio = useMemo(() => {
     try {
       setGuardando(true);
 
-      // Flujo principal: crear cabecera, guardar detalles, recalcular y volver a la vista.
-      const idPersonalizada = await crearCotizacionSiNoExiste();
-      await guardarTodosLosFormularios(idPersonalizada);
-      await recalcularCotizacion(idPersonalizada);
+      const tieneActividadesNuevas = hayActividadesNuevas();
+
+      if (tieneActividadesNuevas) {
+        // Flujo principal: crear cabecera, guardar detalles, recalcular y volver a la vista.
+        const idPersonalizada = await crearCotizacionSiNoExiste();
+        await guardarTodosLosFormularios(idPersonalizada);
+        await recalcularCotizacion(idPersonalizada);
+      } else if (idCotizacionPersonalizada) {
+        // Si solo se eliminaron actividades guardadas, no se exige adicionar otra.
+        await recalcularCotizacion(idCotizacionPersonalizada);
+      }
 
       notify("Cotización personalizada generada correctamente", {
         type: "success",
@@ -638,6 +763,10 @@ const actividadesPorServicio = useMemo(() => {
               errors={errores[1]}
               titulo="Formulario Obra Blanca"
               disabled={cotizacionCerrada || guardando}
+              puedeEliminarGuardadas={puedeEliminarActividadesGuardadas}
+              onEliminarGuardada={(index, item) =>
+                eliminarActividadGuardada(1, index, item)
+              }
             />
           )}
 
@@ -649,6 +778,10 @@ const actividadesPorServicio = useMemo(() => {
               errors={errores[2]}
               titulo="Formulario Carpintería"
               disabled={cotizacionCerrada || guardando}
+              puedeEliminarGuardadas={puedeEliminarActividadesGuardadas}
+              onEliminarGuardada={(index, item) =>
+                eliminarActividadGuardada(2, index, item)
+              }
             />
           )}
 
@@ -660,6 +793,10 @@ const actividadesPorServicio = useMemo(() => {
               errors={errores[3]}
               titulo="Formulario Divisiones en Vidrio"
               disabled={cotizacionCerrada || guardando}
+              puedeEliminarGuardadas={puedeEliminarActividadesGuardadas}
+              onEliminarGuardada={(index, item) =>
+                eliminarActividadGuardada(3, index, item)
+              }
             />
           )}
 
@@ -671,6 +808,10 @@ const actividadesPorServicio = useMemo(() => {
               errors={errores[4]}
               titulo="Formulario Mesones en Mármol"
               disabled={cotizacionCerrada || guardando}
+              puedeEliminarGuardadas={puedeEliminarActividadesGuardadas}
+              onEliminarGuardada={(index, item) =>
+                eliminarActividadGuardada(4, index, item)
+              }
             />
           )}
 

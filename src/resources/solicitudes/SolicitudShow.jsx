@@ -203,7 +203,7 @@ const SolicitudShow = () => {
       <Card sx={{ maxWidth: 1000, mx: "auto", borderRadius: 3, boxShadow: 3 }}>
         <CardContent>
           <Typography variant="h4" fontWeight="bold" mb={3}>
-            Solicitud
+            Visita Tecnica
           </Typography>
 
           <Grid container spacing={2}>
