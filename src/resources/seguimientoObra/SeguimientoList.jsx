@@ -100,6 +100,9 @@ const SeguimientoList = () => {
     ...avances.map((avance) => Number(avance?.porcentajeGeneral || 0))
   );
   const estadoCronograma = String(cronogramaInfo?.estadoCronograma || "").toUpperCase();
+  const cronogramaPendienteInterValle =
+    estadoCronograma === "PENDIENTE_APROBACION_EMPRESA" ||
+    estadoCronograma === "PENDIENTE_APROBACION_INTERIVALLE";
   const cronogramaFinalizado =
     estadoCronograma === "FINALIZADO" &&
     Math.max(avanceGeneralCronograma, avanceGeneralRegistrado) >= 100;
@@ -113,12 +116,18 @@ const SeguimientoList = () => {
   useEffect(() => {
     const nuevo = searchParams.get("nuevo");
 
-    if (nuevo === "1" && avances.length === 0 && puedeEditar && !cronogramaFinalizado) {
+    if (
+      nuevo === "1" &&
+      avances.length === 0 &&
+      puedeEditar &&
+      !cronogramaFinalizado &&
+      !cronogramaPendienteInterValle
+    ) {
       setMostrarForm(true);
       setAvanceEditar(null);
       setAvanceSeleccionado(null);
     }
-  }, [searchParams, avances, puedeEditar, cronogramaFinalizado]);
+  }, [searchParams, avances, puedeEditar, cronogramaFinalizado, cronogramaPendienteInterValle]);
 
   useEffect(() => {
     const idAvance = Number(searchParams.get("avance"));
@@ -135,7 +144,7 @@ const SeguimientoList = () => {
   }, [searchParams, avances, loading]);
 
   const handleNuevo = () => {
-    if (cronogramaFinalizado) {
+    if (cronogramaFinalizado || cronogramaPendienteInterValle) {
       return;
     }
 
@@ -145,6 +154,10 @@ const SeguimientoList = () => {
   };
 
   const handleEditar = (avance) => {
+    if (cronogramaPendienteInterValle) {
+      return;
+    }
+
     setAvanceEditar(avance);
     setMostrarForm(true);
     setAvanceSeleccionado(null);
@@ -189,7 +202,7 @@ const SeguimientoList = () => {
             <Button
               variant="contained"
               onClick={handleNuevo}
-              disabled={cronogramaFinalizado}
+              disabled={cronogramaFinalizado || cronogramaPendienteInterValle}
             >
               Registrar avance
             </Button>
@@ -201,7 +214,27 @@ const SeguimientoList = () => {
         </Box>
       </Box>
 
-      {mostrarForm && (
+      {cronogramaPendienteInterValle && (
+        <Box
+          mb={3}
+          p={2}
+          sx={{
+            borderRadius: 2,
+            border: "1px solid #90CAF9",
+            bgcolor: "#E3F2FD",
+            color: "#0D47A1",
+          }}
+        >
+          <Typography fontWeight="bold">
+            El seguimiento todavía no está activo.
+          </Typography>
+          <Typography variant="body2">
+            InterValle debe aprobar el cronograma para iniciar el registro de avances.
+          </Typography>
+        </Box>
+      )}
+
+      {mostrarForm && !cronogramaPendienteInterValle && (
         <SeguimientoForm
           idCronograma={idCronograma}
           avanceInicial={avanceEditar}
@@ -258,6 +291,7 @@ const SeguimientoList = () => {
                     {puedeEditar && (
                       <Button
                         variant="outlined"
+                        disabled={cronogramaPendienteInterValle}
                         onClick={() => handleEditar(avance)}
                       >
                         Editar

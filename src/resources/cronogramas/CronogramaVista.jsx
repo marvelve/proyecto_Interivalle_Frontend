@@ -27,11 +27,18 @@ import {
 import EditIcon from "@mui/icons-material/Edit";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import SaveIcon from "@mui/icons-material/Save";
+import AddIcon from "@mui/icons-material/Add";
+import DeleteIcon from "@mui/icons-material/Delete";
 import { useNotify } from "react-admin";
 import httpClient, { apiUrl } from "../../app/httpClient";
 
-const labelEstado = (estado) =>
-  estado === "TERMINADA" ? "COMPLETADA" : String(estado || "").replace(/_/g, " ");
+const labelEstado = (estado) => {
+  if (estado === "PENDIENTE_APROBACION_EMPRESA" || estado === "PENDIENTE_APROBACION_INTERIVALLE") {
+    return "Pendiente de aprobación empresa";
+  }
+
+  return estado === "TERMINADA" ? "COMPLETADA" : String(estado || "").replace(/_/g, " ");
+};
 
 const getEstadoColor = (estado) => {
   switch (estado) {
@@ -47,6 +54,13 @@ const getEstadoColor = (estado) => {
         bg: "#FFF3E0",
         text: "#EF6C00",
         chip: "warning",
+      };
+    case "PENDIENTE_APROBACION_EMPRESA":
+    case "PENDIENTE_APROBACION_INTERIVALLE":
+      return {
+        bg: "#E3F2FD",
+        text: "#1565C0",
+        chip: "info",
       };
     case "ATRASADA":
       return {
@@ -108,13 +122,26 @@ const CronogramaVista = () => {
 
   const [tieneSeguimiento, setTieneSeguimiento] = useState(false);
   const [verificandoSeguimiento, setVerificandoSeguimiento] = useState(false);
+  const [aprobandoCronograma, setAprobandoCronograma] = useState(false);
+  const [openEditarCronograma, setOpenEditarCronograma] = useState(false);
+  const [guardandoCronograma, setGuardandoCronograma] = useState(false);
+  const [formCronograma, setFormCronograma] = useState({
+    fechaInicio: "",
+    totalSemanas: 1,
+    detalles: [],
+  });
 
   const idRol = Number(localStorage.getItem("idRol"));
   const esAdmin = idRol === 1;
   const esSupervisor = idRol === 2;
   const esCliente = idRol === 3;
 
-    const puedeGestionarSeguimiento = esAdmin || esSupervisor;
+  const puedeGestionarSeguimiento = esAdmin || esSupervisor;
+  // Antes de iniciar seguimiento, InterValle debe aprobar el cronograma generado por la cotizacion.
+  const cronogramaPendienteInterValle =
+    cronograma?.estadoCronograma === "PENDIENTE_APROBACION_EMPRESA" ||
+    cronograma?.estadoCronograma === "PENDIENTE_APROBACION_INTERIVALLE";
+  const puedeAprobarCronograma = puedeGestionarSeguimiento && cronogramaPendienteInterValle;
 
   useEffect(() => {
     cargarCronograma();
@@ -167,6 +194,165 @@ const verificarSeguimiento = async (idCronograma) => {
     setVerificandoSeguimiento(false);
   }
 };
+
+  const aprobarCronogramaInterValle = async () => {
+    if (!cronograma?.idCronograma || !puedeAprobarCronograma) {
+      return;
+    }
+
+    try {
+      setAprobandoCronograma(true);
+      await httpClient(
+        `${apiUrl}/api/cliente/cronogramas/${cronograma.idCronograma}/aprobar-interivalle`,
+        { method: "PUT" }
+      );
+
+      notify("Cronograma aprobado. El seguimiento de obra queda en proceso.", {
+        type: "success",
+      });
+      await cargarCronograma();
+    } catch (error) {
+      console.error("Error aprobando cronograma:", error);
+      notify(
+        error?.body?.message || error?.message || "No se pudo aprobar el cronograma",
+        { type: "error" }
+      );
+    } finally {
+      setAprobandoCronograma(false);
+    }
+  };
+
+  const abrirEditarCronograma = () => {
+    setFormCronograma({
+      fechaInicio: cronograma?.fechaInicio || "",
+      totalSemanas: semanas.length || cronograma?.totalSemanas || 1,
+      detalles: detalles.map((detalle, index) => ({
+        tmpId: `actual-${detalle.idDetalle || index}`,
+        idDetalle: detalle.idDetalle,
+        servicio: detalle.servicio || "Cronograma",
+        actividad: detalle.actividad || detalle.descripcion || "",
+        descripcion: detalle.descripcion || "",
+        semana: Number(detalle.semana || 1),
+      })),
+    });
+    setOpenEditarCronograma(true);
+  };
+
+  const cerrarEditarCronograma = () => {
+    setOpenEditarCronograma(false);
+  };
+
+  const cambiarCampoCronograma = (campo, valor) => {
+    setFormCronograma((prev) => ({
+      ...prev,
+      [campo]: campo === "totalSemanas" ? Math.max(1, Number(valor || 1)) : valor,
+    }));
+  };
+
+  const cambiarDetalleCronograma = (tmpId, campo, valor) => {
+    setFormCronograma((prev) => ({
+      ...prev,
+      detalles: prev.detalles.map((detalle) =>
+        detalle.tmpId === tmpId
+          ? {
+              ...detalle,
+              [campo]: campo === "semana" ? Math.max(1, Number(valor || 1)) : valor,
+            }
+          : detalle
+      ),
+    }));
+  };
+
+  const agregarActividadCronograma = () => {
+    setFormCronograma((prev) => ({
+      ...prev,
+      detalles: [
+        ...prev.detalles,
+        {
+          tmpId: `nuevo-${Date.now()}`,
+          idDetalle: null,
+          servicio: "Cronograma",
+          actividad: "",
+          descripcion: "",
+          semana: 1,
+        },
+      ],
+    }));
+  };
+
+  const eliminarActividadCronograma = (tmpId) => {
+    setFormCronograma((prev) => ({
+      ...prev,
+      detalles: prev.detalles.filter((detalle) => detalle.tmpId !== tmpId),
+    }));
+  };
+
+  const guardarCronogramaPendiente = async () => {
+    if (!formCronograma.fechaInicio) {
+      notify("Selecciona la fecha de inicio", { type: "warning" });
+      return;
+    }
+
+    if (!formCronograma.detalles.length) {
+      notify("El cronograma debe tener al menos una actividad", { type: "warning" });
+      return;
+    }
+
+    const totalSemanas = Math.max(1, Number(formCronograma.totalSemanas || 1));
+    const actividadSinNombre = formCronograma.detalles.some(
+      (detalle) => !String(detalle.actividad || "").trim()
+    );
+
+    if (actividadSinNombre) {
+      notify("Todas las actividades deben tener nombre", { type: "warning" });
+      return;
+    }
+
+    const semanaFueraRango = formCronograma.detalles.some((detalle) => {
+      const semana = Number(detalle.semana || 0);
+      return semana < 1 || semana > totalSemanas;
+    });
+
+    if (semanaFueraRango) {
+      notify(`Las actividades deben estar entre la semana 1 y ${totalSemanas}`, {
+        type: "warning",
+      });
+      return;
+    }
+
+    try {
+      setGuardandoCronograma(true);
+      const { json } = await httpClient(
+        `${apiUrl}/api/cliente/cronogramas/${cronograma.idCronograma}/pendiente`,
+        {
+          method: "PUT",
+          body: JSON.stringify({
+            fechaInicio: formCronograma.fechaInicio,
+            totalSemanas,
+            detalles: formCronograma.detalles.map((detalle) => ({
+              idDetalle: detalle.idDetalle || null,
+              servicio: detalle.servicio || "Cronograma",
+              actividad: String(detalle.actividad || "").trim(),
+              descripcion: String(detalle.descripcion || "").trim(),
+              semana: Number(detalle.semana || 1),
+            })),
+          }),
+        }
+      );
+
+      setCronograma(json);
+      notify("Cronograma actualizado correctamente", { type: "success" });
+      cerrarEditarCronograma();
+    } catch (error) {
+      console.error("Error actualizando cronograma:", error);
+      notify(
+        error?.body?.message || error?.message || "No se pudo actualizar el cronograma",
+        { type: "error" }
+      );
+    } finally {
+      setGuardandoCronograma(false);
+    }
+  };
 
   const semanas = useMemo(() => {
     if (!cronograma?.semanas) return [];
@@ -380,11 +566,35 @@ const verificarSeguimiento = async (idCronograma) => {
   </Typography>
 
     <Stack direction="row" spacing={2} flexWrap="wrap">
+    {puedeAprobarCronograma && (
+      <Button
+        variant="contained"
+        color="primary"
+        startIcon={<EditIcon />}
+        onClick={abrirEditarCronograma}
+        sx={{ textTransform: "none", borderRadius: 2 }}
+      >
+        Editar cronograma
+      </Button>
+    )}
+
+    {puedeAprobarCronograma && (
+      <Button
+        variant="contained"
+        color="warning"
+        disabled={aprobandoCronograma}
+        onClick={aprobarCronogramaInterValle}
+        sx={{ textTransform: "none", borderRadius: 2 }}
+      >
+        {aprobandoCronograma ? "Aprobando..." : "Aprobar cronograma"}
+      </Button>
+    )}
+
     {puedeGestionarSeguimiento && (
       <Button
         variant="contained"
         color="success"
-        disabled={verificandoSeguimiento || tieneSeguimiento}
+        disabled={verificandoSeguimiento || tieneSeguimiento || cronogramaPendienteInterValle}
         onClick={() =>
           navigate(`/cronogramas/${cronograma.idCronograma}/seguimiento`)
         }
@@ -397,7 +607,7 @@ const verificarSeguimiento = async (idCronograma) => {
     {puedeGestionarSeguimiento ? (
       <Button
         variant="contained"
-        disabled={verificandoSeguimiento || !tieneSeguimiento}
+        disabled={verificandoSeguimiento || !tieneSeguimiento || cronogramaPendienteInterValle}
         onClick={() =>
           navigate(`/cronogramas/${cronograma.idCronograma}/seguimiento`)
         }
@@ -408,6 +618,7 @@ const verificarSeguimiento = async (idCronograma) => {
     ) : esCliente ? (
       <Button
         variant="contained"
+        disabled={cronogramaPendienteInterValle}
         onClick={() =>
           navigate(`/cronogramas/${cronograma.idCronograma}/seguimiento`)
         }
@@ -427,6 +638,26 @@ const verificarSeguimiento = async (idCronograma) => {
     </Button>
   </Stack>
 </Stack>
+
+      {cronogramaPendienteInterValle && (
+        <Box
+          sx={{
+            mb: 3,
+            p: 2,
+            borderRadius: 2,
+            border: "1px solid #90CAF9",
+            bgcolor: "#E3F2FD",
+            color: "#0D47A1",
+          }}
+        >
+          <Typography fontWeight="bold">
+            El cronograma está pendiente de aprobación por parte de la empresa.
+          </Typography>
+          <Typography variant="body2">
+            El seguimiento de obra se habilitará cuando un administrador o supervisor apruebe la programación.
+          </Typography>
+        </Box>
+      )}
 
       <Box
         sx={{
@@ -694,6 +925,177 @@ const verificarSeguimiento = async (idCronograma) => {
           )}
         </CardContent>
       </Card>
+
+      <Dialog
+        open={openEditarCronograma}
+        onClose={cerrarEditarCronograma}
+        fullWidth
+        maxWidth="lg"
+      >
+        <DialogTitle>Editar cronograma pendiente</DialogTitle>
+
+        <DialogContent>
+          <Box mt={1} display="flex" flexDirection="column" gap={3}>
+            <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+              <TextField
+                label="Fecha inicio"
+                type="date"
+                value={formCronograma.fechaInicio}
+                onChange={(event) =>
+                  cambiarCampoCronograma("fechaInicio", event.target.value)
+                }
+                fullWidth
+                InputLabelProps={{ shrink: true }}
+              />
+
+              <TextField
+                label="Número de semanas"
+                type="number"
+                value={formCronograma.totalSemanas}
+                onChange={(event) =>
+                  cambiarCampoCronograma("totalSemanas", event.target.value)
+                }
+                fullWidth
+                inputProps={{ min: 1, max: 52 }}
+              />
+            </Stack>
+
+            <Box display="flex" justifyContent="space-between" alignItems="center" gap={2}>
+              <Typography variant="h6" fontWeight="bold">
+                Actividades
+              </Typography>
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={agregarActividadCronograma}
+                sx={{ textTransform: "none", borderRadius: 2 }}
+              >
+                Agregar actividad
+              </Button>
+            </Box>
+
+            <TableContainer component={Paper} sx={{ borderRadius: 2 }}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow sx={{ backgroundColor: "#E8F5E9" }}>
+                    <TableCell sx={{ fontWeight: "bold", width: "18%" }}>
+                      Servicio
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: "bold", width: "26%" }}>
+                      Actividad
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: "bold", width: "34%" }}>
+                      Descripción
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: "bold", width: 110 }}>
+                      Semana
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: "bold", width: 90 }}>
+                      Acciones
+                    </TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {formCronograma.detalles.map((detalle) => (
+                    <TableRow key={detalle.tmpId}>
+                      <TableCell>
+                        <TextField
+                          value={detalle.servicio}
+                          onChange={(event) =>
+                            cambiarDetalleCronograma(
+                              detalle.tmpId,
+                              "servicio",
+                              event.target.value
+                            )
+                          }
+                          size="small"
+                          fullWidth
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <TextField
+                          value={detalle.actividad}
+                          onChange={(event) =>
+                            cambiarDetalleCronograma(
+                              detalle.tmpId,
+                              "actividad",
+                              event.target.value
+                            )
+                          }
+                          size="small"
+                          fullWidth
+                          required
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <TextField
+                          value={detalle.descripcion}
+                          onChange={(event) =>
+                            cambiarDetalleCronograma(
+                              detalle.tmpId,
+                              "descripcion",
+                              event.target.value
+                            )
+                          }
+                          size="small"
+                          fullWidth
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <TextField
+                          type="number"
+                          value={detalle.semana}
+                          onChange={(event) =>
+                            cambiarDetalleCronograma(
+                              detalle.tmpId,
+                              "semana",
+                              event.target.value
+                            )
+                          }
+                          size="small"
+                          fullWidth
+                          inputProps={{
+                            min: 1,
+                            max: Math.max(1, Number(formCronograma.totalSemanas || 1)),
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Tooltip title="Eliminar actividad">
+                          <span>
+                            <Button
+                              color="error"
+                              variant="outlined"
+                              size="small"
+                              onClick={() => eliminarActividadCronograma(detalle.tmpId)}
+                              disabled={formCronograma.detalles.length <= 1}
+                              sx={{ minWidth: 42 }}
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </Button>
+                          </span>
+                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Box>
+        </DialogContent>
+
+        <DialogActions>
+          <Button onClick={cerrarEditarCronograma}>Cancelar</Button>
+          <Button
+            variant="contained"
+            startIcon={<SaveIcon />}
+            onClick={guardarCronogramaPendiente}
+            disabled={guardandoCronograma}
+          >
+            {guardandoCronograma ? "Guardando..." : "Guardar cronograma"}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog
         open={openEdit}

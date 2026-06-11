@@ -22,9 +22,17 @@ const CronogramaActions = () => {
 };
 
 const estadoCronogramaChoices = [
-  { id: "EN_PROCESO", name: "EN_PROCESO" },
-  { id: "FINALIZADO", name: "FINALIZADO" },
+  { id: "PENDIENTE_APROBACION_EMPRESA", name: "Pendiente de aprobación empresa" },
+  { id: "EN_PROCESO", name: "En proceso" },
+  { id: "FINALIZADO", name: "Finalizado" },
 ];
+
+const labelEstadoCronograma = (estado) => {
+  if (estado === "PENDIENTE_APROBACION_EMPRESA" || estado === "PENDIENTE_APROBACION_INTERIVALLE") {
+    return "Pendiente de aprobación empresa";
+  }
+  return String(estado || "").replace(/_/g, " ");
+};
 
 const cronogramaFilters = [
   <DateInput key="fechaInicio" label="Fecha inicio" source="fechaInicio" alwaysOn />,
@@ -72,7 +80,7 @@ const CronogramaList = () => {
         <ClienteProyectoCardsFromList
           emptyText="No tienes cronogramas registrados."
           getProyecto={(record) => record.nombreProyecto}
-          getEstado={(record) => record.estadoCronograma}
+          getEstado={(record) => labelEstadoCronograma(record.estadoCronograma)}
           getFecha={(record) => record.fechaInicio}
           getFechaLabel={() => "Fecha inicio"}
           getDetalle={(record) =>
@@ -121,7 +129,11 @@ const CronogramaList = () => {
           <TextField source="nombreCliente" label="Cliente" />
         )}
 
-        <TextField source="estadoCronograma" label="Estado" />
+        <FunctionField
+          source="estadoCronograma"
+          label="Estado"
+          render={(record) => labelEstadoCronograma(record?.estadoCronograma)}
+        />
         <DateField source="fechaInicio" label="Fecha inicio" showTime={false} />
         <DateField source="fechaFin" label="Fecha fin" showTime={false} />
 

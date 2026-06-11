@@ -21,6 +21,8 @@ const estadoCotizacionChoices = [
   { id: "GENERADA", name: "GENERADA" },
   { id: "ENVIADA", name: "ENVIADA" },
   { id: "APROBADA", name: "APROBADA" },
+  { id: "APROBADA_CLIENTE", name: "APROBADA_CLIENTE" },
+  { id: "APROBADA_FINAL", name: "APROBADA_FINAL" },
   { id: "RECHAZADA", name: "RECHAZADA" },
   { id: "EN_REVISION", name: "EN_REVISION" },
 ];
@@ -39,7 +41,9 @@ const cotizacionFilters = [
 ];
 
 const esAprobada = (estado) =>
-  String(estado || "").toUpperCase() === "APROBADA";
+  ["APROBADA", "APROBADA_CLIENTE", "APROBADA_FINAL"].includes(
+    String(estado || "").toUpperCase()
+  );
 
 const crearFechaLocal = (value) => {
   if (!value) return null;

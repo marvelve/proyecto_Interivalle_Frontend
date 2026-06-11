@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Box,
   Button,
@@ -59,6 +59,18 @@ const limpiarDatosSolicitudLocal = () => {
   localStorage.removeItem("celularCliente");
 };
 
+const obtenerServiciosGuardados = () => {
+  try {
+    const servicios = JSON.parse(
+      localStorage.getItem("serviciosSeleccionados") || "[]"
+    );
+
+    return Array.isArray(servicios) ? servicios.map(Number) : [];
+  } catch (error) {
+    return [];
+  }
+};
+
 const obtenerFechaMinima = () => {
   const hoy = new Date();
   hoy.setDate(hoy.getDate() + 1);
@@ -80,6 +92,7 @@ const validarHoraVisita = (hora) =>
 
 const SolicitudCreate = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const notify = useNotify();
 
   const correoUsuario = localStorage.getItem("correoUsuario");
@@ -90,10 +103,35 @@ const SolicitudCreate = () => {
   const [idSolicitud, setIdSolicitud] = React.useState(null);
 
   const esVisitaTecnica = formData.tipoSolicitud === "VISITA_TECNICA";
+  const actualizandoSolicitudBase =
+    location.state?.conservarDatosCotizacionBase === true;
+  const idCotizacionRetorno = location.state?.idCotizacionRetorno;
 
   React.useEffect(() => {
-    limpiarDatosSolicitudLocal();
-  }, []);
+    const conservarDatos =
+      location.state?.conservarDatosCotizacionBase === true;
+
+    if (!conservarDatos) {
+      limpiarDatosSolicitudLocal();
+      return;
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      tipoSolicitud:
+        localStorage.getItem("tipoSolicitud") || prev.tipoSolicitud,
+      nombreProyecto:
+        localStorage.getItem("nombreProyecto") || prev.nombreProyecto,
+      fechaVisita: localStorage.getItem("fechaVisita") || prev.fechaVisita,
+      horaVisita: localStorage.getItem("horaVisita") || prev.horaVisita,
+      direccionVisita:
+        localStorage.getItem("direccionVisita") || prev.direccionVisita,
+      celularCliente:
+        localStorage.getItem("celularCliente") || prev.celularCliente,
+    }));
+    setServiciosSeleccionados(obtenerServiciosGuardados());
+    setIdSolicitud(localStorage.getItem("idSolicitud"));
+  }, [location.state]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -244,18 +282,52 @@ const SolicitudCreate = () => {
     return json;
   };
 
+  const actualizarSolicitudExistente = async () => {
+    const solicitudIdActual = idSolicitud || localStorage.getItem("idSolicitud");
+
+    if (!solicitudIdActual) {
+      throw new Error("No se encontrÃ³ la solicitud para actualizar servicios");
+    }
+
+    const payload = construirPayload();
+
+    const { json } = await httpClient(
+      `${apiUrl}/api/solicitudes/${solicitudIdActual}/servicios`,
+      {
+        method: "PUT",
+        body: JSON.stringify(payload),
+        headers: new Headers({
+          "Content-Type": "application/json",
+        }),
+      }
+    );
+
+    if (!json?.idSolicitud) {
+      throw new Error("La solicitud se actualizÃ³, pero no se recibiÃ³ el idSolicitud");
+    }
+
+    return json;
+  };
+
   const handleGuardar = async () => {
     if (!validarFormulario()) return;
 
     try {
       setLoading(true);
 
-      const json = await crearNuevaSolicitud();
+      const json = actualizandoSolicitudBase
+        ? await actualizarSolicitudExistente()
+        : await crearNuevaSolicitud();
 
       setIdSolicitud(json.idSolicitud);
       guardarEnLocalStorage(json.idSolicitud);
 
-      notify("Solicitud guardada en estado PENDIENTE", { type: "success" });
+      notify(
+        actualizandoSolicitudBase
+          ? "Servicios de la solicitud actualizados"
+          : "Solicitud guardada en estado PENDIENTE",
+        { type: "success" }
+      );
       navigate("/solicitudes");
     } catch (error) {
       console.error(error);
@@ -276,18 +348,27 @@ const SolicitudCreate = () => {
     try {
       setLoading(true);
 
-      const json = await crearNuevaSolicitud();
+      const json = actualizandoSolicitudBase
+        ? await actualizarSolicitudExistente()
+        : await crearNuevaSolicitud();
       const solicitudIdNueva = json.idSolicitud;
 
       setIdSolicitud(solicitudIdNueva);
       guardarEnLocalStorage(solicitudIdNueva);
 
       if (formData.tipoSolicitud === "COTIZACION_BASE") {
-        notify("Solicitud creada correctamente. Estado: PENDIENTE", {
-          type: "success",
-        });
+        notify(
+          actualizandoSolicitudBase
+            ? "Servicios actualizados. Complete la cotizacion nuevamente."
+            : "Solicitud creada correctamente. Estado: PENDIENTE",
+          { type: "success" }
+        );
 
-        navigate("/cotizacion-base");
+        navigate(
+          idCotizacionRetorno
+            ? `/cotizacion-base/${idCotizacionRetorno}/editar`
+            : "/cotizacion-base"
+        );
       } else {
         notify("Visita técnica creada correctamente", {
           type: "success",

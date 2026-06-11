@@ -125,7 +125,9 @@ const CotizacionBase = () => {
   const navigate = useNavigate();
   const { idCotizacion } = useParams();
   const modoEdicion = Boolean(idCotizacion);
-  const esCliente = Number(localStorage.getItem("idRol")) === 3;
+  const idRol = Number(localStorage.getItem("idRol"));
+  const esCliente = idRol === 3;
+  const esAdminSupervisor = idRol === 1 || idRol === 2;
 
   const [loading, setLoading] = useState(true);
   const [serviciosSeleccionados, setServiciosSeleccionados] = useState([]);
@@ -226,6 +228,16 @@ const CotizacionBase = () => {
       if (json.solicitudId) {
         localStorage.setItem("idSolicitud", String(json.solicitudId));
       }
+      localStorage.setItem("tipoSolicitud", "COTIZACION_BASE");
+      localStorage.setItem("nombreProyecto", json.nombreProyecto || "");
+      localStorage.setItem(
+        "serviciosSeleccionados",
+        JSON.stringify(
+          (json.serviciosSeleccionados || [])
+            .map((servicio) => servicio.idServicio)
+            .filter(Boolean)
+        )
+      );
 
       setServiciosSeleccionados(json.serviciosSeleccionados || []);
       cargarDatosFormularioEdicion(json);
@@ -622,6 +634,15 @@ const CotizacionBase = () => {
     }
   };
 
+  const handleVolverASeleccionServicios = () => {
+    navigate("/solicitudes/create", {
+      state: {
+        conservarDatosCotizacionBase: true,
+        idCotizacionRetorno: modoEdicion ? idCotizacion : null,
+      },
+    });
+  };
+
   if (loading) {
     return (
       <Box p={3}>
@@ -650,7 +671,16 @@ const CotizacionBase = () => {
     formDataMezon.mezonCocina ||
     formDataMezon.mezonBarra ||
     formDataMezon.mezonLavamanos;
-  const cotizacionAprobada = cotizacionEditada?.estado === "APROBADA";
+  const cotizacionAprobada =
+    cotizacionEditada?.estado === "APROBADA" ||
+    cotizacionEditada?.estado === "APROBADA_CLIENTE" ||
+    cotizacionEditada?.estado === "APROBADA_FINAL";
+  const cotizacionRechazada = cotizacionEditada?.estado === "RECHAZADA";
+  const cotizacionAprobadaInterivalle = Boolean(cotizacionEditada?.aprobadaInterivalle);
+  const bloquearActualizacionCotizacion =
+    cotizacionRechazada ||
+    cotizacionAprobadaInterivalle ||
+    cotizacionAprobada;
 
   return (
     <Box p={4}>
@@ -1134,10 +1164,19 @@ const CotizacionBase = () => {
           </Button>
 
           <Button
+            variant="outlined"
+            color="success"
+            onClick={handleVolverASeleccionServicios}
+            disabled={bloquearActualizacionCotizacion}
+          >
+            VOLVER A SERVICIOS
+          </Button>
+
+          <Button
             variant="contained"
             color="success"
             onClick={handleGenerarCotizacion}
-            disabled={cotizacionAprobada}
+            disabled={bloquearActualizacionCotizacion}
             sx={{
               fontSize: 0,
               "&::after": {

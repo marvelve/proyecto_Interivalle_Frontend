@@ -886,6 +886,7 @@ const CotizacionVista = () => {
   const [openAprobar, setOpenAprobar] = useState(false);
   const [fechaInicio, setFechaInicio] = useState("");
   const [aprobando, setAprobando] = useState(false);
+  const [aprobandoInterivalle, setAprobandoInterivalle] = useState(false);
   const [cronogramaCotizacion, setCronogramaCotizacion] = useState(null);
   const [consultandoCronograma, setConsultandoCronograma] = useState(false);
   const [fechasInicioDisponibles, setFechasInicioDisponibles] = useState([]);
@@ -898,6 +899,7 @@ const CotizacionVista = () => {
 
   const idRol = Number(localStorage.getItem("idRol"));
   const esCliente = idRol === 3;
+  const esAdminSupervisor = idRol === 1 || idRol === 2;
   const puedeGestionarCotizacion = idRol === 1 || idRol === 2 || idRol === 3;
 
   useEffect(() => {
@@ -1124,7 +1126,12 @@ const CotizacionVista = () => {
         return res.json();
       });
 
-      notify("Cotización aprobada correctamente", { type: "success" });
+        notify(
+          esCliente
+          ? "Cotización aprobada. El cronograma queda pendiente de aprobación por InterValle."
+          : "Cotización aprobada. Cronograma pendiente de aprobación InterValle.",
+          { type: "success" }
+        );
       setOpenAprobar(false);
       await cargarCotizacion();
       await cargarCronogramaCotizacion(false);
@@ -1136,6 +1143,49 @@ const CotizacionVista = () => {
       });
     } finally {
       setAprobando(false);
+    }
+  };
+
+  const handleDevolverARevision = async () => {
+    if (!esAdminSupervisor) {
+      notify("No tienes permisos para devolver la cotización a revisión", {
+        type: "warning",
+      });
+      return;
+    }
+
+    try {
+      setAprobandoInterivalle(true);
+      const token = localStorage.getItem("token");
+      const opcionesRequest = {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      };
+
+      const response = await fetch(
+        `${apiUrl}/api/cotizaciones/${idCotizacion}/devolver-revision`,
+        opcionesRequest
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "No se pudo devolver la cotización a revisión");
+      }
+
+      notify("Cotización devuelta a revisión. El cliente debe revisarla y aprobarla nuevamente.", {
+        type: "success",
+      });
+      await cargarCotizacion();
+    } catch (error) {
+      console.error(error);
+      notify(error.message || "Error al devolver la cotización a revisión", {
+        type: "error",
+      });
+    } finally {
+      setAprobandoInterivalle(false);
     }
   };
 
@@ -1345,12 +1395,35 @@ const CotizacionVista = () => {
     setFiltroActividad("");
   };
 
-  const cotizacionAprobada = normalizarTexto(cotizacion?.estado) === "aprobada";
+  const estadoCotizacion = normalizarTexto(cotizacion?.estado);
+  const cotizacionAprobadaInterivalle =
+    Boolean(cotizacion?.aprobadaInterivalle) || estadoCotizacion === "aprobada_final";
+  const cotizacionAprobadaCliente =
+    estadoCotizacion === "aprobada_cliente" || estadoCotizacion === "aprobada";
+  const cotizacionAprobada = cotizacionAprobadaCliente || estadoCotizacion === "aprobada_final";
+  const cotizacionAntesAprobar =
+    estadoCotizacion === "generada" || estadoCotizacion === "en_revision";
+  const cotizacionEditableAntesAprobar =
+    esAdminSupervisor &&
+    cotizacionAprobadaCliente &&
+    !cotizacionAprobadaInterivalle;
+  const puedeAprobarCotizacion =
+    puedeGestionarCotizacion && cotizacionAntesAprobar;
+  const puedeDevolverARevision =
+    esAdminSupervisor && cotizacionAprobadaCliente && !cotizacionAprobadaInterivalle;
+  const puedeAdicionarActividades =
+    estadoCotizacion !== "rechazada" &&
+    !cotizacionAprobada &&
+    (esCliente && cotizacionAntesAprobar);
+  const puedeClienteVolverEditar = esCliente && cotizacionAntesAprobar;
   const cronogramaDisponible = Boolean(
     cronogramaCotizacion?.idCronograma ||
       cotizacion?.idCronograma ||
       cotizacion?.cronogramaGenerado
   );
+  const cronogramaPendienteInterValle =
+    cronogramaCotizacion?.estadoCronograma === "PENDIENTE_APROBACION_EMPRESA" ||
+    cronogramaCotizacion?.estadoCronograma === "PENDIENTE_APROBACION_INTERIVALLE";
 
   const fechasInicioDisponiblesSet = useMemo(() => {
     return new Set(
@@ -1415,6 +1488,17 @@ const CotizacionVista = () => {
       notify("No se encontro cronograma para esta cotizacion", {
         type: "warning",
       });
+      return;
+    }
+
+    if (
+      cronograma?.estadoCronograma === "PENDIENTE_APROBACION_EMPRESA" ||
+      cronograma?.estadoCronograma === "PENDIENTE_APROBACION_INTERIVALLE"
+    ) {
+      notify(
+        "El seguimiento se habilitará cuando InterValle apruebe el cronograma.",
+        { type: "info" }
+      );
       return;
     }
 
@@ -1505,6 +1589,15 @@ const CotizacionVista = () => {
             Estado: <strong>{cotizacion.estado}</strong>
           </Typography>
 
+          {cotizacionAprobada && (
+            <Typography variant="body1">
+              Aprobación empresa:{" "}
+              <strong>
+                {cotizacionAprobadaInterivalle ? "APROBADA" : "PENDIENTE"}
+              </strong>
+            </Typography>
+          )}
+
           <Typography variant="body1">
             Área privada: <strong>{formatearAreaPrivada(medidaAreaPrivada)}</strong>
           </Typography>
@@ -1594,17 +1687,48 @@ const CotizacionVista = () => {
         </Grid>
 
         <Box display="flex" gap={2} flexWrap="wrap" mb={3}>
+          {cotizacionEditableAntesAprobar && (
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleDevolverARevision}
+              disabled={aprobandoInterivalle}
+            >
+              {aprobandoInterivalle ? "DEVOLVIENDO..." : "DEVOLVER A REVISIÓN"}
+            </Button>
+          )}
+
           {puedeGestionarCotizacion && (
             <Button
               variant="contained"
               color="success"
               onClick={() => setOpenAprobar(true)}
-              disabled={
-                cotizacion?.estado === "APROBADA" ||
-                cotizacion?.estado === "RECHAZADA"
-              }
+              disabled={!puedeAprobarCotizacion}
             >
               APROBAR
+            </Button>
+          )}
+
+          {puedeClienteVolverEditar && (
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={() => navigate(`/cotizacion-base/${idCotizacion}/editar`)}
+            >
+              VOLVER/EDITAR
+            </Button>
+          )}
+
+          {puedeGestionarCotizacion && (
+            <Button
+              variant="contained"
+              color="success"
+              onClick={() =>
+                navigate(`/cotizacion-personalizada/formularios/${idCotizacion}`)
+              }
+              disabled={!puedeAdicionarActividades}
+            >
+              ADICIONAR A COTIZACIÓN
             </Button>
           )}
 
@@ -1622,7 +1746,10 @@ const CotizacionVista = () => {
             color="primary"
             onClick={irASeguimiento}
             disabled={
-              !cotizacionAprobada || !cronogramaDisponible || consultandoCronograma
+              !cotizacionAprobada ||
+              !cronogramaDisponible ||
+              consultandoCronograma ||
+              cronogramaPendienteInterValle
             }
           >
             {consultandoCronograma ? "CARGANDO..." : "VER SEGUIMIENTO"}
@@ -1688,32 +1815,6 @@ const CotizacionVista = () => {
               Limpiar filtros
             </Button>
 
-            <Button
-              variant="contained"
-              color="success"
-              onClick={() => navigate(`/cotizacion-base/${idCotizacion}/editar`)}
-              disabled={cotizacion?.estado === "APROBADA"}
-            >
-              VOLVER/EDITAR
-            </Button>
-
-            {puedeGestionarCotizacion && (
-              <Button
-                variant="contained"
-                color="success"
-                onClick={() =>
-                  navigate(
-                    `/cotizacion-personalizada/formularios/${idCotizacion}`
-                  )
-                }
-                disabled={
-                  cotizacion?.estado === "APROBADA" ||
-                  cotizacion?.estado === "RECHAZADA"
-                }
-              >
-                ADICIONAR A COTIZACION
-              </Button>
-            )}
           </Grid>
         </Grid>
 
