@@ -3,7 +3,7 @@ import { AppBar, TitlePortal } from "react-admin";
 import { Box } from "@mui/material";
 import NotificacionesMenu from "../resources/Notificaciones/NotificacionMenu";
 
-const LOGO_APPBAR = "/imagenes/landing/Logo_Interivalle2.png";
+const LOGO_APPBAR = "/imagenes/Logo_Interivalle2.png";
 
 const CustomAppBar = () => (
   <AppBar

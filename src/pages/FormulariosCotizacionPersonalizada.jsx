@@ -75,8 +75,19 @@ const obtenerServiciosDeSolicitud = (data) => {
   );
 };
 
+const obtenerIdSolicitudDeCotizacion = (data) =>
+  data?.solicitudId ||
+  data?.idSolicitud ||
+  data?.id_solicitud ||
+  data?.solicitud?.idSolicitud ||
+  data?.solicitud?.solicitudId ||
+  data?.solicitud?.id_solicitud ||
+  null;
+
 const esCotizacionCerrada = (estado) =>
-  ["APROBADA", "RECHAZADA"].includes((estado || "").toString().toUpperCase());
+  ["APROBADA", "APROBADA_CLIENTE", "APROBADA_FINAL", "RECHAZADA"].includes(
+    (estado || "").toString().toUpperCase()
+  );
 
 const esCotizacionGenerada = (estado) =>
   (estado || "").toString().toUpperCase() === "GENERADA";
@@ -134,6 +145,8 @@ const FormulariosCotizacionPersonalizada = () => {
   const { idCotizacion } = useParams();
   const navigate = useNavigate();
   const notify = useNotify();
+  const idRol = Number(localStorage.getItem("idRol"));
+  const esAdminSupervisor = idRol === 1 || idRol === 2;
 
   const [loading, setLoading] = useState(true);
   const [guardando, setGuardando] = useState(false);
@@ -243,18 +256,24 @@ const actividadesPorServicio = useMemo(() => {
       }
 
       // Consulta la cotizacion base para conocer estado, proyecto y solicitud asociada.
-      const { json: cotizacionJson } = await httpClient(
-        `${apiUrl}/api/cliente/cotizaciones/${idCotizacion}`,
-        { method: "GET" }
-      );
+      const endpointCotizacion = esAdminSupervisor
+        ? `${apiUrl}/api/cotizaciones/${idCotizacion}`
+        : `${apiUrl}/api/cliente/cotizaciones/${idCotizacion}`;
+
+      const { json: cotizacionJson } = await httpClient(endpointCotizacion, {
+        method: "GET",
+      });
 
       setCotizacion(cotizacionJson);
 
-      const solicitudIdDesdeCotizacion =
-        cotizacionJson?.solicitudId ||
-        cotizacionJson?.idSolicitud ||
-        cotizacionJson?.solicitud?.idSolicitud ||
-        cotizacionJson?.solicitud?.solicitudId;
+      let solicitudIdDesdeCotizacion =
+        obtenerIdSolicitudDeCotizacion(cotizacionJson);
+
+      let personalizadaExistente = null;
+      if (!solicitudIdDesdeCotizacion) {
+        personalizadaExistente = await cargarPersonalizadaExistente();
+        solicitudIdDesdeCotizacion = personalizadaExistente?.idSolicitud || null;
+      }
 
       if (solicitudIdDesdeCotizacion) {
         setIdSolicitud(solicitudIdDesdeCotizacion);
@@ -277,7 +296,9 @@ const actividadesPorServicio = useMemo(() => {
         }
       }
 
-      await cargarPersonalizadaExistente();
+      if (!personalizadaExistente) {
+        await cargarPersonalizadaExistente();
+      }
     } catch (error) {
       console.error("Error cargando datos iniciales:", error);
       notify("No fue posible cargar los datos iniciales", { type: "error" });
@@ -341,11 +362,14 @@ const actividadesPorServicio = useMemo(() => {
           crearActividadVacia(),
         ]);
       }
+
+      return json;
     } catch (error) {
       const mensaje = error?.body?.message || error?.message || "";
       if (!mensaje.includes("No existe cotización personalizada")) {
         console.warn("No fue posible cargar adicionales existentes:", error);
       }
+      return null;
     }
   };
 
@@ -438,13 +462,9 @@ const actividadesPorServicio = useMemo(() => {
   const crearCotizacionSiNoExiste = async () => {
     if (idCotizacionPersonalizada) return idCotizacionPersonalizada;
 
-    if (!idSolicitud) {
-      throw new Error("No se pudo identificar la solicitud de la cotización");
-    }
-
     const payload = {
       idCotizacion: Number(idCotizacion),
-      idSolicitud: Number(idSolicitud),
+      idSolicitud: idSolicitud ? Number(idSolicitud) : null,
       nombreProyecto,
       observacionGeneral: "Adición de actividades personalizadas",
     };

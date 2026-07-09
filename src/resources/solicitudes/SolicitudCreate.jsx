@@ -16,7 +16,7 @@ import { useNotify } from "react-admin";
 import httpClient, { apiUrl } from "../../app/httpClient";
 
 const SERVICIOS_DISPONIBLES = [
-  { id: 1, nombre: "Mano de Obra" },
+  { id: 1, nombre: "Obra Blanca y Materiales" },
   { id: 2, nombre: "Carpintería" },
   { id: 3, nombre: "Divisiones en Vidrio" },
   { id: 4, nombre: "Mesones en Mármol" },

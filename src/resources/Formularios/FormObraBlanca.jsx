@@ -103,6 +103,8 @@ const FormObraBlanca = ({
     return Number.isFinite(numero) ? numero : 0;
   };
 
+  const redondearEntero = (valor) => Math.round(toNumero(valor));
+
   const esNumeroValido = (valor) => !esVacio(valor) && toNumero(valor) > 0;
 
   const esTipoMetro = (tipoCobro = "") =>
@@ -207,7 +209,7 @@ const FormObraBlanca = ({
 
     return {
       ...actividadActualizada,
-      subtotal,
+      subtotal: redondearEntero(subtotal),
     };
   };
 
@@ -295,10 +297,10 @@ const FormObraBlanca = ({
   };
 
   const totalGeneral = useMemo(() => {
-    return actividades.reduce(
+    return redondearEntero(actividades.reduce(
       (acc, item) => acc + toNumero(item.subtotal),
       0
-    );
+    ));
   }, [actividades]);
 
   return (
@@ -457,7 +459,7 @@ const FormObraBlanca = ({
                   <TextField
                     fullWidth
                     label="Subtotal"
-                    value={item.subtotal ?? 0}
+                    value={redondearEntero(item.subtotal)}
                     disabled={filaDeshabilitada}
                     InputProps={{ readOnly: true }}
                     InputLabelProps={{ shrink: true }}

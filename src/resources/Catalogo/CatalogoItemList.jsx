@@ -1,5 +1,6 @@
 import * as React from "react";
 import {
+  Button,
   Datagrid,
   EditButton,
   FunctionField,
@@ -8,8 +9,11 @@ import {
   SelectInput,
   TextField,
   TextInput,
+  useRecordContext,
+  useRedirect,
 } from "react-admin";
 import { Chip } from "@mui/material";
+import SettingsIcon from "@mui/icons-material/Settings";
 
 const formatearMoneda = (valor) =>
   new Intl.NumberFormat("es-CO", {
@@ -26,15 +30,37 @@ const catalogoFilters = [
     source="tipoItem"
     choices={[
       { id: "ACTIVIDAD", name: "ACTIVIDAD" },
+      { id: "ACTIVIDAD ADICIONAL", name: "ACTIVIDAD ADICIONAL" },
       { id: "MATERIAL", name: "MATERIAL" },
       { id: "PRODUCTO", name: "PRODUCTO" },
     ]}
     alwaysOn
   />,
 
-  <TextInput label="Categoría" source="categoria" alwaysOn />,
+  <TextInput label="Categoria / Tipo de cobro" source="categoria" alwaysOn />,
   <TextInput label="Servicio" source="nombreServicio" alwaysOn />,
 ];
+
+const GestionarRelacionesButton = () => {
+  const record = useRecordContext();
+  const redirect = useRedirect();
+
+  if (record?.tipoItem !== "MATERIAL") {
+    return null;
+  }
+
+  return (
+    <Button
+      label="Gestionar relaciones"
+      onClick={(event) => {
+        event.stopPropagation();
+        redirect("edit", "catalogo-v2", record.id);
+      }}
+    >
+      <SettingsIcon />
+    </Button>
+  );
+};
 
 const CatalogoItemList = () => (
   <List
@@ -47,7 +73,7 @@ const CatalogoItemList = () => (
       <TextField source="tablaOrigen" label="Tabla" />
       <TextField source="nombreServicio" label="Servicio" />
       <TextField source="tipoItem" label="Tipo" />
-      <TextField source="categoria" label="Categoría" />
+      <TextField source="categoria" label="Categoria / Tipo de cobro" />
       <TextField source="nombreItem" label="Ítem" />
 
       <NumberField
@@ -66,6 +92,7 @@ const CatalogoItemList = () => (
       />
 
       <TextField source="relacionesV2" label="Relaciones V2" />
+      <GestionarRelacionesButton />
 
       <FunctionField
         label="Activo"

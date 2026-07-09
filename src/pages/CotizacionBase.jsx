@@ -19,8 +19,41 @@ const tiposCielo = ["ESTUCO", "DRYWALL"];
 const tiposApertura = ["CORREDIZA", "BATIENTE"];
 const coloresAccesorios = ["NEGROS", "PLATEADOS"];
 const precioMetroMarmol = 850000;
+const DECIMAL_INPUT_PROPS = {
+  inputMode: "decimal",
+  pattern: "[0-9]*[.,]?[0-9]*",
+  min: 0.01,
+  step: 0.01,
+};
+const INTEGER_INPUT_PROPS = {
+  min: 0,
+  step: 1,
+};
+const ESTILOS_FORMULARIO = {
+  "& .MuiInputLabel-root": {
+    color: "#000",
+    fontSize: "1rem",
+    fontWeight: 500,
+  },
+  "& .MuiInputLabel-root.Mui-focused": {
+    color: "#000",
+  },
+  "& .MuiFormControlLabel-label": {
+    color: "#000",
+    fontSize: "1rem",
+  },
+};
+
+const limpiarNumeroPositivo = (valor, soloEnteros = false) => {
+  const texto = String(valor ?? "").replace(/-/g, "");
+  return soloEnteros ? texto.replace(/[^\d]/g, "") : texto.replace(/[^\d.,]/g, "");
+};
+
+const normalizarDecimal = (valor) =>
+  String(valor ?? "").trim().replace(",", ".");
+
 const toEnteroNoNegativo = (valor) => {
-  const numero = Number.parseInt(valor, 10);
+  const numero = Number.parseInt(normalizarDecimal(valor), 10);
   return Number.isNaN(numero) || numero < 0 ? 0 : numero;
 };
 
@@ -33,7 +66,7 @@ const limitarCantidadBanosCarpinteria = (valor) =>
   Math.min(4, toEnteroNoNegativo(valor));
 
 const toNumeroNoNegativo = (valor) => {
-  const numero = Number.parseFloat(valor);
+  const numero = Number.parseFloat(normalizarDecimal(valor));
   return Number.isNaN(numero) || numero < 0 ? 0 : numero;
 };
 
@@ -137,9 +170,13 @@ const CotizacionBase = () => {
   const [formDataManoObra, setFormDataManoObra] = useState({
     medidaAreaPrivada: "",
     cantidadBanos: "0",
+    requiereDemolerBano: false,
+    requiereSobrepisoNivelacion: false,
     tipoCielo: "ESTUCO",
     divisionPared: false,
-    
+    cantidadPoyos: esCliente ? "3" : "0",
+    requiereCentrarLuces: false,
+    cantidadPuntosElectricos: "0",
   });
 
   const [formDataCarpinteria, setFormDataCarpinteria] = useState({
@@ -260,8 +297,13 @@ const CotizacionBase = () => {
       setFormDataManoObra({
         medidaAreaPrivada: valorInput(manoObra.medidaAreaPrivada),
         cantidadBanos: String(limitarCantidadBanosObraBlanca(manoObra.cantidadBanos ?? 0)),
+        requiereDemolerBano: !!manoObra.requiereDemolerBano,
+        requiereSobrepisoNivelacion: !!manoObra.requiereSobrepisoNivelacion,
         tipoCielo: manoObra.tipoCielo || "ESTUCO",
         divisionPared: !!manoObra.divisionPared,
+        cantidadPoyos: esCliente ? "3" : valorInput(manoObra.cantidadPoyos ?? 0),
+        requiereCentrarLuces: toEnteroNoNegativo(manoObra.cantidadPuntosElectricos) > 0,
+        cantidadPuntosElectricos: valorInput(manoObra.cantidadPuntosElectricos ?? 0),
       });
     }
 
@@ -334,9 +376,21 @@ const CotizacionBase = () => {
 
   const handleChangeManoObra = (e) => {
     const { name, value } = e.target;
+    const nuevoValor =
+      name === "cantidadBanos" ||
+      name === "cantidadPoyos" ||
+      name === "cantidadPuntosElectricos"
+        ? limpiarNumeroPositivo(value, true)
+        : name === "medidaAreaPrivada"
+          ? limpiarNumeroPositivo(value)
+          : value;
+
     setFormDataManoObra((prev) => ({
       ...prev,
-      [name]: value,
+      [name]: nuevoValor,
+      ...(name === "cantidadBanos" && limitarCantidadBanosObraBlanca(nuevoValor) !== 1
+        ? { requiereDemolerBano: false }
+        : {}),
     }));
   };
 
@@ -345,6 +399,9 @@ const CotizacionBase = () => {
     setFormDataManoObra((prev) => ({
       ...prev,
       [name]: value === "SI",
+      ...(name === "requiereCentrarLuces" && value !== "SI"
+        ? { cantidadPuntosElectricos: "0" }
+        : {}),
     }));
   };
 
@@ -369,8 +426,15 @@ const CotizacionBase = () => {
 
   const handleChangeCarpinteria = (e) => {
     const { name, value } = e.target;
+    const camposEnteros = ["cantidadCloset", "cantidadPuertas", "cantidadBanos"];
+    const camposDecimales = ["muebleAltoCocina", "muebleBajoCocina", "muebleBarra"];
+    const valorLimpio = camposEnteros.includes(name)
+      ? limpiarNumeroPositivo(value, true)
+      : camposDecimales.includes(name)
+        ? limpiarNumeroPositivo(value)
+        : value;
     const nuevoValor =
-      name === "cantidadBanos" ? String(limitarCantidadBanosCarpinteria(value)) : value;
+      name === "cantidadBanos" ? String(limitarCantidadBanosCarpinteria(valorLimpio)) : valorLimpio;
 
     setFormDataCarpinteria((prev) => ({
       ...prev,
@@ -399,9 +463,10 @@ const CotizacionBase = () => {
 
   const handleChangeVidrio = (e) => {
     const { name, value } = e.target;
+    const nuevoValor = name === "cantidadBanos" ? limpiarNumeroPositivo(value, true) : value;
     setFormDataVidrio((prev) => ({
       ...prev,
-      [name]: value,
+      [name]: nuevoValor,
     }));
   };
 
@@ -423,25 +488,48 @@ const CotizacionBase = () => {
 
   const handleChangeMezon = (e) => {
     const { name, value } = e.target;
+    const camposMedida = ["medidaCocina", "medidaBarra", "medidaLavamanos"];
     setFormDataMezon((prev) => ({
       ...prev,
-      [name]: value,
+      [name]: camposMedida.includes(name) ? limpiarNumeroPositivo(value) : value,
     }));
   };
 
   const validarFormulario = () => {
     if (seccionManoObraVisible) {
-      if (!formDataManoObra.medidaAreaPrivada) {
-        alert("Debe ingresar la medida del área privada.");
+      if (toNumeroNoNegativo(formDataManoObra.medidaAreaPrivada) <= 0) {
+        alert("Debe ingresar la medida del área privada mayor a cero.");
         return false;
       }
       if (!formDataManoObra.tipoCielo) {
         alert("Debe seleccionar el tipo de cielo.");
         return false;
       }
+      if (
+        esAdminSupervisor &&
+        formDataManoObra.requiereCentrarLuces &&
+        toEnteroNoNegativo(formDataManoObra.cantidadPuntosElectricos) <= 0
+      ) {
+        alert("Debe ingresar una cantidad de luces mayor a cero.");
+        return false;
+      }
     }
 
     if (seccionCarpinteriaVisible) {
+      const hayItemCarpinteria =
+        toEnteroNoNegativo(formDataCarpinteria.cantidadCloset) > 0 ||
+        Boolean(formDataCarpinteria.vestierBasico) ||
+        toEnteroNoNegativo(formDataCarpinteria.cantidadPuertas) > 0 ||
+        toNumeroNoNegativo(formDataCarpinteria.muebleAltoCocina) > 0 ||
+        toNumeroNoNegativo(formDataCarpinteria.muebleBajoCocina) > 0 ||
+        toNumeroNoNegativo(formDataCarpinteria.muebleBarra) > 0 ||
+        toEnteroNoNegativo(formDataCarpinteria.cantidadBanos) > 0;
+
+      if (!hayItemCarpinteria) {
+        alert("Debe ingresar al menos una cantidad o medida de carpintería mayor a cero.");
+        return false;
+      }
+
       const cantidadBanosCarpinteria = toEnteroNoNegativo(
         formDataCarpinteria.cantidadBanos
       );
@@ -538,8 +626,23 @@ const CotizacionBase = () => {
                 ? Number(formDataManoObra.medidaAreaPrivada)
                 : null,
               cantidadBanos: limitarCantidadBanosObraBlanca(formDataManoObra.cantidadBanos),
+              requiereDemolerBano:
+                limitarCantidadBanosObraBlanca(formDataManoObra.cantidadBanos) === 1
+                  ? !!formDataManoObra.requiereDemolerBano
+                  : false,
+              requiereSobrepisoNivelacion:
+                !!formDataManoObra.requiereSobrepisoNivelacion,
               tipoCielo: formDataManoObra.tipoCielo || null,
-              divisionPared: !!formDataManoObra.divisionPared
+              divisionPared: !!formDataManoObra.divisionPared,
+              cantidadPoyos: esCliente
+                ? 3
+                : toEnteroNoNegativo(formDataManoObra.cantidadPoyos),
+              cantidadPuntosElectricos:
+                esCliente
+                  ? 4
+                  : esAdminSupervisor && formDataManoObra.requiereCentrarLuces
+                  ? toEnteroNoNegativo(formDataManoObra.cantidadPuntosElectricos)
+                  : 0,
             }
           : null,
         carpinteria: seccionCarpinteriaVisible
@@ -684,7 +787,7 @@ const CotizacionBase = () => {
 
   return (
     <Box p={4}>
-      <Paper elevation={3} sx={{ p: 4, borderRadius: 3 }}>
+      <Paper elevation={3} sx={{ p: 4, borderRadius: 3, ...ESTILOS_FORMULARIO }}>
         <Typography variant="h3" fontWeight="bold" gutterBottom>
           Cotización Base
         </Typography>
@@ -716,8 +819,10 @@ const CotizacionBase = () => {
                   name="medidaAreaPrivada"
                   value={formDataManoObra.medidaAreaPrivada}
                   onChange={handleChangeManoObra}
-                  type="number"
-                  inputProps={{ min: 0 }}
+                  type="text"
+                  placeholder="Ej: 45.50"
+                  inputProps={DECIMAL_INPUT_PROPS}
+                  InputLabelProps={{ shrink: true }}
                   variant="standard"
                 />
               </Grid>
@@ -740,6 +845,42 @@ const CotizacionBase = () => {
                       {cantidad}
                     </MenuItem>
                   ))}
+                </TextField>
+              </Grid>
+
+              {limitarCantidadBanosObraBlanca(formDataManoObra.cantidadBanos) === 1 && (
+                <Grid item xs={12} md={3}>
+                  <TextField
+                    fullWidth
+                    select
+                    label="Requiere demoler?"
+                    name="requiereDemolerBano"
+                    value={formDataManoObra.requiereDemolerBano ? "SI" : "NO"}
+                    onChange={handleBooleanManoObra}
+                    variant="standard"
+                    InputLabelProps={{ shrink: true }}
+                    sx={{ minWidth: 180 }}
+                  >
+                    <MenuItem value="SI">SI</MenuItem>
+                    <MenuItem value="NO">NO</MenuItem>
+                  </TextField>
+                </Grid>
+              )}
+
+              <Grid item xs={12} md={4} lg={3}>
+                <TextField
+                  fullWidth
+                  select
+                  label="¿Necesita sobrepiso nivelación?"
+                  name="requiereSobrepisoNivelacion"
+                  value={formDataManoObra.requiereSobrepisoNivelacion ? "SI" : "NO"}
+                  onChange={handleBooleanManoObra}
+                  variant="standard"
+                  InputLabelProps={{ shrink: true }}
+                  sx={{ minWidth: 260 }}
+                >
+                  <MenuItem value="SI">SI</MenuItem>
+                  <MenuItem value="NO">NO</MenuItem>
                 </TextField>
               </Grid>
 
@@ -777,6 +918,58 @@ const CotizacionBase = () => {
                   <MenuItem value="NO">No</MenuItem>
                 </TextField>
               </Grid>
+
+              {esAdminSupervisor && (
+                <Grid item xs={12} md={3}>
+                  <TextField
+                    fullWidth
+                    label="Cantidad de poyos"
+                    name="cantidadPoyos"
+                    value={formDataManoObra.cantidadPoyos}
+                    onChange={handleChangeManoObra}
+                    type="number"
+                    inputProps={INTEGER_INPUT_PROPS}
+                    InputLabelProps={{ shrink: true }}
+                    variant="standard"
+                  />
+                </Grid>
+              )}
+
+              {esAdminSupervisor && (
+                <Grid item xs={12} md={4} lg={3}>
+                  <TextField
+                    fullWidth
+                    select
+                    label="¿Centrar luces?"
+                    name="requiereCentrarLuces"
+                    value={formDataManoObra.requiereCentrarLuces ? "SI" : "NO"}
+                    onChange={handleBooleanManoObra}
+                    variant="standard"
+                    InputLabelProps={{ shrink: true }}
+                    sx={{ minWidth: 190 }}
+                  >
+                    <MenuItem value="SI">Sí</MenuItem>
+                    <MenuItem value="NO">No</MenuItem>
+                  </TextField>
+                </Grid>
+              )}
+
+              {esAdminSupervisor && formDataManoObra.requiereCentrarLuces && (
+                <Grid item xs={12} md={3} lg={2}>
+                  <TextField
+                    fullWidth
+                    required
+                    label="Cantidad"
+                    name="cantidadPuntosElectricos"
+                    value={formDataManoObra.cantidadPuntosElectricos}
+                    onChange={handleChangeManoObra}
+                    type="number"
+                    inputProps={INTEGER_INPUT_PROPS}
+                    InputLabelProps={{ shrink: true }}
+                    variant="standard"
+                  />
+                </Grid>
+              )}
             </Grid>
 
             <Divider sx={{ my: 4 }} />
@@ -799,6 +992,7 @@ const CotizacionBase = () => {
                   value={formDataCarpinteria.cantidadCloset}
                   onChange={handleChangeCarpinteria}
                   type="number"
+                  inputProps={INTEGER_INPUT_PROPS}
                   variant="standard"
                 />
               </Grid>
@@ -828,6 +1022,7 @@ const CotizacionBase = () => {
                   value={formDataCarpinteria.cantidadPuertas}
                   onChange={handleChangeCarpinteria}
                   type="number"
+                  inputProps={INTEGER_INPUT_PROPS}
                   variant="standard"
                 />
               </Grid>
@@ -839,7 +1034,10 @@ const CotizacionBase = () => {
                   name="muebleAltoCocina"
                   value={formDataCarpinteria.muebleAltoCocina}
                   onChange={handleChangeCarpinteria}
-                  type="number"
+                  type="text"
+                  placeholder="Ej: 1.50"
+                  inputProps={DECIMAL_INPUT_PROPS}
+                  InputLabelProps={{ shrink: true }}
                   variant="standard"
                 />
               </Grid>
@@ -851,7 +1049,10 @@ const CotizacionBase = () => {
                   name="muebleBajoCocina"
                   value={formDataCarpinteria.muebleBajoCocina}
                   onChange={handleChangeCarpinteria}
-                  type="number"
+                  type="text"
+                  placeholder="Ej: 1.50"
+                  inputProps={DECIMAL_INPUT_PROPS}
+                  InputLabelProps={{ shrink: true }}
                   variant="standard"
                 />
               </Grid>
@@ -863,7 +1064,10 @@ const CotizacionBase = () => {
                   name="muebleBarra"
                   value={formDataCarpinteria.muebleBarra}
                   onChange={handleChangeCarpinteria}
-                  type="number"
+                  type="text"
+                  placeholder="Ej: 1.50"
+                  inputProps={DECIMAL_INPUT_PROPS}
+                  InputLabelProps={{ shrink: true }}
                   variant="standard"
                 />
               </Grid>
@@ -952,6 +1156,7 @@ const CotizacionBase = () => {
                   value={formDataVidrio.cantidadBanos}
                   onChange={handleChangeVidrio}
                   type="number"
+                  inputProps={{ min: 1, step: 1 }}
                   variant="standard"
                 />
               </Box>
@@ -1041,8 +1246,10 @@ const CotizacionBase = () => {
                       name="medidaCocina"
                       value={formDataMezon.medidaCocina}
                       onChange={handleChangeMezon}
-                      type="number"
-                      inputProps={{ min: 0, step: 0.01 }}
+                      type="text"
+                      placeholder="Ej: 1.50"
+                      inputProps={DECIMAL_INPUT_PROPS}
+                      InputLabelProps={{ shrink: true }}
                       variant="standard"
                     />
                   </Grid>
@@ -1081,8 +1288,10 @@ const CotizacionBase = () => {
                       name="medidaBarra"
                       value={formDataMezon.medidaBarra}
                       onChange={handleChangeMezon}
-                      type="number"
-                      inputProps={{ min: 0, step: 0.01 }}
+                      type="text"
+                      placeholder="Ej: 1.50"
+                      inputProps={DECIMAL_INPUT_PROPS}
+                      InputLabelProps={{ shrink: true }}
                       variant="standard"
                     />
                   </Grid>
@@ -1121,8 +1330,10 @@ const CotizacionBase = () => {
                       name="medidaLavamanos"
                       value={formDataMezon.medidaLavamanos}
                       onChange={handleChangeMezon}
-                      type="number"
-                      inputProps={{ min: 0, step: 0.01 }}
+                      type="text"
+                      placeholder="Ej: 1.50"
+                      inputProps={DECIMAL_INPUT_PROPS}
+                      InputLabelProps={{ shrink: true }}
                       variant="standard"
                     />
                   </Grid>

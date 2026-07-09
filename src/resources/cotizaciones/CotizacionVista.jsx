@@ -13,14 +13,18 @@ import {
   DialogContent,
   DialogActions,
   IconButton,
+  Checkbox,
 } from "@mui/material";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import DownloadIcon from "@mui/icons-material/Download";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 
 import { useNotify } from "react-admin";
 import { useNavigate, useParams } from "react-router-dom";
 import httpClient, { apiUrl } from "../../app/httpClient";
+
+const LOGO_INTERVALLE_URL = "/imagenes/Logo_Interivalle2.png";
 
 const formatearMoneda = (valor) => {
   if (valor === null || valor === undefined) return "$0";
@@ -620,27 +624,44 @@ const construirHtmlCotizacionPdf = ({
         <meta charset="utf-8" />
         <title>Cotización ${escapeHtml(cotizacion.idCotizacion)}</title>
         <style>
-          @page { size: A4 landscape; margin: 12mm; }
+          @page {
+            size: A4 landscape;
+            margin: 8mm 8mm 14mm;
+
+            @bottom-center {
+              content: "Página " counter(page) " de " counter(pages);
+              color: #555;
+              font-family: Arial, Helvetica, sans-serif;
+              font-size: 9px;
+            }
+          }
           * { box-sizing: border-box; }
           body {
             color: #111;
             font-family: Arial, Helvetica, sans-serif;
-            font-size: 11px;
+            font-size: 9px;
             margin: 0;
           }
-          h1 { font-size: 28px; margin: 0 0 12px; }
-          h2 { font-size: 18px; margin: 24px 0 10px; }
-          h3 { font-size: 15px; margin: 18px 0 8px; }
-          p { margin: 4px 0; }
-          section { break-inside: avoid; page-break-inside: avoid; }
+          h1 { font-size: 24px; margin: 0 0 8px; }
+          h2 { break-after: avoid; font-size: 15px; margin: 14px 0 6px; }
+          h3 { break-after: avoid; font-size: 12px; margin: 12px 0 5px; }
+          p { margin: 3px 0; }
+          section { break-inside: auto; page-break-inside: auto; }
           table {
             border-collapse: collapse;
-            margin-top: 8px;
+            break-inside: auto;
+            margin-top: 5px;
+            page-break-inside: auto;
             width: 100%;
+          }
+          thead { display: table-header-group; }
+          tr {
+            break-inside: avoid;
+            page-break-inside: avoid;
           }
           th, td {
             border: 1px solid #cfcfcf;
-            padding: 7px;
+            padding: 4px 5px;
             text-align: left;
             vertical-align: top;
           }
@@ -658,17 +679,18 @@ const construirHtmlCotizacionPdf = ({
             border-radius: 4px;
             color: #111;
             flex: 1;
-            font-size: 11px;
+            font-size: 9px;
             font-weight: 700;
             line-height: 1.35;
-            padding: 7px 10px;
+            padding: 5px 8px;
             text-transform: uppercase;
           }
           .section-title-row {
             align-items: center;
+            break-after: avoid;
             display: flex;
-            gap: 14px;
-            margin: 24px 0 10px;
+            gap: 10px;
+            margin: 14px 0 6px;
           }
           .section-title-row h2 {
             margin: 0;
@@ -678,21 +700,22 @@ const construirHtmlCotizacionPdf = ({
           .strong { font-weight: 700; }
           .meta {
             display: grid;
-            gap: 6px 20px;
+            gap: 4px 16px;
             grid-template-columns: repeat(2, minmax(0, 1fr));
-            margin-bottom: 18px;
+            margin-bottom: 10px;
           }
           .meta-full { grid-column: 1 / -1; }
           .summary {
             display: grid;
-            gap: 10px;
+            gap: 6px;
             grid-template-columns: repeat(4, minmax(0, 1fr));
-            margin: 18px 0 22px;
+            margin: 10px 0 12px;
           }
           .summary-card {
             border: 1px solid #d9d9d9;
             border-radius: 6px;
-            padding: 10px;
+            break-inside: avoid;
+            padding: 6px;
             text-align: center;
           }
           .summary-card-total-general {
@@ -704,26 +727,40 @@ const construirHtmlCotizacionPdf = ({
           .summary-card-total-general .summary-value {
             font-weight: 700;
           }
-          .summary-label { font-size: 11px; margin-bottom: 6px; }
-          .summary-value { font-size: 15px; font-weight: 700; }
+          .summary-label { font-size: 9px; margin-bottom: 3px; }
+          .summary-value { font-size: 12px; font-weight: 700; }
           .total-row td { font-weight: 700; }
           .final-summary {
-            margin-top: 24px;
+            margin-top: 12px;
             max-width: 420px;
           }
           .final-summary td:first-child { font-weight: 700; width: 55%; }
+          .pdf-logo {
+            height: 42px;
+            object-fit: contain;
+            position: absolute;
+            right: 0;
+            top: 0;
+            width: 190px;
+            z-index: 10;
+          }
+          .pdf-header-spacer {
+            height: 4px;
+          }
           @media print {
             * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
           }
         </style>
       </head>
       <body>
+        <img class="pdf-logo" src="${LOGO_INTERVALLE_URL}" alt="InterValle" />
+        <div class="pdf-header-spacer"></div>
         <h1>Cotización #${escapeHtml(cotizacion.idCotizacion)}</h1>
         <div class="meta">
           <p><strong>Proyecto:</strong> ${escapeHtml(cotizacion.nombreProyecto || "-")}</p>
           <p><strong>Área privada:</strong> ${escapeHtml(formatearAreaPrivada(medidaAreaPrivada))}</p>
           <p><strong>Estado:</strong> ${escapeHtml(cotizacion.estado || "-")}</p>
-          <p class="meta-full"><strong>Servicios seleccionados:</strong> ${escapeHtml(servicios)}</p>
+          <p class="meta-full"><strong>Servicios seleccionados CON MATERIAL:</strong> ${escapeHtml(servicios)}</p>
         </div>
 
         <div class="summary">
@@ -744,11 +781,11 @@ const construirHtmlCotizacionPdf = ({
         ${renderTablaProductosPdf("Detalle Divisiones en Vidrio", detallesVidrio, totales.totalVidrio, "Total Divisiones en Vidrio")}
         ${renderTablaProductosPdf("Detalle Mesones en Mármol", detallesMezon, totales.totalMezon, "Total Mesones en Mármol")}
 
-        <section>
-          <h2>Actividades adicionales</h2>
-          ${
-            hayAdicionales
-              ? `
+        ${
+          hayAdicionales
+            ? `
+              <section>
+                <h2>Actividades adicionales</h2>
                 ${renderTablaAdicionalesPdf("Mano de Obra / Obra Blanca", [
                   { titulo: "Actividad", valor: (item) => item.actividad || "-" },
                   { titulo: "Lugar", valor: (item) => item.lugar || "-" },
@@ -780,10 +817,10 @@ const construirHtmlCotizacionPdf = ({
                   { titulo: "Precio Unitario", valor: (item) => formatearMoneda(item.precioUnitario) },
                   { titulo: "Subtotal", valor: (item) => formatearMoneda(item.subtotal) },
                 ], adicionalesMeson, "No hay mesón granito adicional.")}
-              `
-              : "<p>No hay actividades adicionales registradas.</p>"
-          }
-        </section>
+              </section>
+            `
+            : ""
+        }
 
         <section>
           <h2>Resumen final</h2>
@@ -831,8 +868,9 @@ const construirFilasConRowSpan = (semanas = []) => {
 
         mostrarActividad: true,
         rowSpanActividad: 1,
-        actividad: "-",
-        precioActividad: null,
+          actividad: "-",
+          idDetalleActividad: null,
+          precioActividad: null,
 
         cantidad: "",
         material: "",
@@ -856,9 +894,10 @@ const construirFilasConRowSpan = (semanas = []) => {
           mostrarActividad: indexMaterial === 0,
           rowSpanActividad: indexMaterial === 0 ? rowSpanActividad : 0,
           actividad: act?.actividad || "-",
+          idDetalleActividad: act?.idDetalle ?? null,
           precioActividad: act?.precioActividad ?? null,
 
-          cantidad: mat?.cantidad ?? "",
+          cantidad: mat?.cantidad ?? act?.cantidadActividad ?? "",
           material: mat?.material ?? "",
           precioMaterial: mat?.precioMaterial ?? null,
         });
@@ -887,6 +926,8 @@ const CotizacionVista = () => {
   const [fechaInicio, setFechaInicio] = useState("");
   const [aprobando, setAprobando] = useState(false);
   const [aprobandoInterivalle, setAprobandoInterivalle] = useState(false);
+  const [actividadesSeleccionadas, setActividadesSeleccionadas] = useState([]);
+  const [eliminandoActividades, setEliminandoActividades] = useState(false);
   const [cronogramaCotizacion, setCronogramaCotizacion] = useState(null);
   const [consultandoCronograma, setConsultandoCronograma] = useState(false);
   const [fechasInicioDisponibles, setFechasInicioDisponibles] = useState([]);
@@ -1151,6 +1192,7 @@ const CotizacionVista = () => {
       notify("No tienes permisos para devolver la cotización a revisión", {
         type: "warning",
       });
+      setActividadesSeleccionadas([]);
       return;
     }
 
@@ -1395,6 +1437,14 @@ const CotizacionVista = () => {
     setFiltroActividad("");
   };
 
+  const alternarActividadSeleccionada = (idDetalleActividad) => {
+    setActividadesSeleccionadas((seleccionadas) =>
+      seleccionadas.includes(idDetalleActividad)
+        ? seleccionadas.filter((id) => id !== idDetalleActividad)
+        : [...seleccionadas, idDetalleActividad]
+    );
+  };
+
   const estadoCotizacion = normalizarTexto(cotizacion?.estado);
   const cotizacionAprobadaInterivalle =
     Boolean(cotizacion?.aprobadaInterivalle) || estadoCotizacion === "aprobada_final";
@@ -1403,6 +1453,8 @@ const CotizacionVista = () => {
   const cotizacionAprobada = cotizacionAprobadaCliente || estadoCotizacion === "aprobada_final";
   const cotizacionAntesAprobar =
     estadoCotizacion === "generada" || estadoCotizacion === "en_revision";
+  const puedeEliminarActividades =
+    esAdminSupervisor && cotizacionAntesAprobar && !cotizacionAprobada;
   const cotizacionEditableAntesAprobar =
     esAdminSupervisor &&
     cotizacionAprobadaCliente &&
@@ -1414,8 +1466,12 @@ const CotizacionVista = () => {
   const puedeAdicionarActividades =
     estadoCotizacion !== "rechazada" &&
     !cotizacionAprobada &&
-    (esCliente && cotizacionAntesAprobar);
-  const puedeClienteVolverEditar = esCliente && cotizacionAntesAprobar;
+    (
+      (esAdminSupervisor && cotizacionAntesAprobar) ||
+      (esCliente && estadoCotizacion === "generada")
+    );
+  const puedeVolverEditarCotizacion =
+    cotizacionAntesAprobar && (esCliente || esAdminSupervisor);
   const cronogramaDisponible = Boolean(
     cronogramaCotizacion?.idCronograma ||
       cotizacion?.idCronograma ||
@@ -1424,6 +1480,57 @@ const CotizacionVista = () => {
   const cronogramaPendienteInterValle =
     cronogramaCotizacion?.estadoCronograma === "PENDIENTE_APROBACION_EMPRESA" ||
     cronogramaCotizacion?.estadoCronograma === "PENDIENTE_APROBACION_INTERIVALLE";
+
+  const eliminarActividadesSeleccionadas = async () => {
+    if (!puedeEliminarActividades || actividadesSeleccionadas.length === 0) {
+      return;
+    }
+
+    const cantidad = actividadesSeleccionadas.length;
+    const confirmado = window.confirm(
+      `¿Eliminar ${cantidad} ${cantidad === 1 ? "actividad" : "actividades"} y sus materiales asociados de esta cotización?`
+    );
+
+    if (!confirmado) return;
+
+    setEliminandoActividades(true);
+    try {
+      const { json } = await httpClient(
+        `${apiUrl}/api/cotizaciones/${idCotizacion}/eliminar-actividades`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            idsDetalleActividad: actividadesSeleccionadas,
+          }),
+        }
+      );
+
+      setCotizacion({
+        ...json,
+        detalleBase: json.detalleBase || json.detalles || [],
+        semanas: json.semanas || [],
+        totalManoObra: json.totalManoObra ?? 0,
+        totalMateriales: json.totalMateriales ?? 0,
+        totalProductos: json.totalProductos ?? 0,
+        totalEstimadoBase: json.totalEstimadoBase ?? 0,
+        totalAdicionales: json.totalAdicionales ?? 0,
+        totalGeneral: json.totalGeneral ?? 0,
+      });
+      setActividadesSeleccionadas([]);
+      notify("Actividades eliminadas y totales recalculados", {
+        type: "success",
+      });
+    } catch (error) {
+      notify(
+        error?.body?.message ||
+          error?.message ||
+          "No se pudieron eliminar las actividades",
+        { type: "error" }
+      );
+    } finally {
+      setEliminandoActividades(false);
+    }
+  };
 
   const fechasInicioDisponiblesSet = useMemo(() => {
     return new Set(
@@ -1568,8 +1675,26 @@ const CotizacionVista = () => {
 
   return (
     <Box p={4}>
-      <Paper elevation={3} sx={{ p: 4, borderRadius: 3 }}>
-        <Typography variant="h3" fontWeight="bold" gutterBottom>
+      <Paper elevation={3} sx={{ p: 4, borderRadius: 3, position: "relative" }}>
+        <Box
+          component="img"
+          src={LOGO_INTERVALLE_URL}
+          alt="InterValle"
+          sx={{
+            position: "absolute",
+            top: 24,
+            right: 32,
+            width: { xs: 130, sm: 170, md: 220 },
+            maxHeight: 70,
+            objectFit: "contain",
+          }}
+        />
+        <Typography
+          variant="h3"
+          fontWeight="bold"
+          gutterBottom
+          sx={{ pr: { xs: 0, md: 30 } }}
+        >
           Cotización #{cotizacion.idCotizacion}
         </Typography>
 
@@ -1603,7 +1728,7 @@ const CotizacionVista = () => {
           </Typography>
 
           <Typography variant="body1" sx={{ gridColumn: { md: "1 / -1" } }}>
-            Servicios seleccionados:{" "}
+            Servicios seleccionados CON MATERIAL:{" "}
             <strong>
               {serviciosSeleccionados.length > 0
                 ? serviciosSeleccionados.join(", ")
@@ -1660,15 +1785,6 @@ const CotizacionVista = () => {
 
           <Grid item xs={12} sm={6} md={3}>
             <Box sx={estilos.resumenCard}>
-              <Typography variant="subtitle2">Total Base</Typography>
-              <Typography variant="h6">
-                {formatearMoneda(totalBaseMostrar)}
-              </Typography>
-            </Box>
-          </Grid>
-
-          <Grid item xs={12} sm={6} md={3}>
-            <Box sx={estilos.resumenCard}>
               <Typography variant="subtitle2">Total Adicionales</Typography>
               <Typography variant="h6">
                 {formatearMoneda(totalAdicionalesMostrar)}
@@ -1709,7 +1825,7 @@ const CotizacionVista = () => {
             </Button>
           )}
 
-          {puedeClienteVolverEditar && (
+          {puedeVolverEditarCotizacion && (
             <Button
               variant="contained"
               color="primary"
@@ -1834,6 +1950,24 @@ const CotizacionVista = () => {
               {avisoMaterialesPropietarioTexto}
             </Box>
           )}
+
+          {puedeEliminarActividades && (
+            <Button
+              variant="contained"
+              color="error"
+              startIcon={<DeleteOutlineIcon />}
+              onClick={eliminarActividadesSeleccionadas}
+              disabled={
+                actividadesSeleccionadas.length === 0 ||
+                eliminandoActividades
+              }
+              sx={{ ml: { md: "auto" } }}
+            >
+              {eliminandoActividades
+                ? "Eliminando..."
+                : "Eliminar actividades seleccionadas"}
+            </Button>
+          )}
         </Box>
 
         <Box sx={{ overflowX: "auto" }}>
@@ -1842,6 +1976,9 @@ const CotizacionVista = () => {
               <tr>
                 <th style={estilos.th}>Semana</th>
                 <th style={estilos.th}>Valor MANO OBRA semana</th>
+                {puedeEliminarActividades && (
+                  <th style={estilos.th}>Seleccionar</th>
+                )}
                 <th style={estilos.th}>Actividad</th>
                 <th style={estilos.th}>Valor actividad</th>
                 <th style={estilos.th}>Cantidad</th>
@@ -1868,6 +2005,29 @@ const CotizacionVista = () => {
                       {fila.mostrarSemana && (
                         <td style={estilos.tdSemana} rowSpan={fila.rowSpanSemana}>
                           {formatearMoneda(fila.totalSemana)}
+                        </td>
+                      )}
+
+                      {puedeEliminarActividades && fila.mostrarActividad && (
+                        <td
+                          style={estilos.tdActividad}
+                          rowSpan={fila.rowSpanActividad}
+                        >
+                          {fila.idDetalleActividad !== null && (
+                            <Checkbox
+                              checked={actividadesSeleccionadas.includes(
+                                fila.idDetalleActividad
+                              )}
+                              onChange={() =>
+                                alternarActividadSeleccionada(
+                                  fila.idDetalleActividad
+                                )
+                              }
+                              inputProps={{
+                                "aria-label": `Seleccionar actividad ${fila.actividad}`,
+                              }}
+                            />
+                          )}
                         </td>
                       )}
 
@@ -1905,7 +2065,10 @@ const CotizacionVista = () => {
                 })
               ) : (
                 <tr>
-                  <td style={estilos.td} colSpan="7">
+                  <td
+                    style={estilos.td}
+                    colSpan={puedeEliminarActividades ? "8" : "7"}
+                  >
                     No hay actividades de Obra Blanca para los filtros seleccionados.
                   </td>
                 </tr>
@@ -2287,8 +2450,3 @@ const CotizacionVista = () => {
 };
 
 export default CotizacionVista;
-
-
-
-
-
