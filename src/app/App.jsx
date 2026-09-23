@@ -176,14 +176,14 @@ const App = () => {
           />
         ) : null,
 
-        permissions === "1" ? (
+        permissions === "1" || permissions === "2" ? (
           <Resource
             key="catalogo-v2"
             name="catalogo-v2"
             options={{ label: "Actualización de precios" }}
             list={CatalogoItemList}
             edit={CatalogoItemEdit}
-            create={CatalogoItemCreate}
+            create={permissions === "1" ? CatalogoItemCreate : undefined}
           />
         ): null,
       ]}

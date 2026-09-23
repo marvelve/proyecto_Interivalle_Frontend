@@ -224,8 +224,15 @@ const handleCerrarImagen = () => {
                         ) : (
                           <video
                             controls
-                            width="90%"
-                            style={{ borderRadius: 8, border: "1px solid #ddd" }}
+                            style={{
+                              width: "100%",
+                              maxHeight: "min(360px, 45vh)",
+                              objectFit: "contain",
+                              display: "block",
+                              backgroundColor: "#000",
+                              borderRadius: 8,
+                              border: "1px solid #ddd",
+                            }}
                           >
                             <source src={urlCompleta} />
                             Tu navegador no soporta video.

@@ -73,6 +73,12 @@ const CatalogoItemList = () => (
       <TextField source="tablaOrigen" label="Tabla" />
       <TextField source="nombreServicio" label="Servicio" />
       <TextField source="tipoItem" label="Tipo" />
+      <FunctionField
+        label="Semana"
+        render={(record) =>
+          record?.tipoItem === "ACTIVIDAD" && record?.semana ? record.semana : "-"
+        }
+      />
       <TextField source="categoria" label="Categoria / Tipo de cobro" />
       <TextField source="nombreItem" label="Ítem" />
 

@@ -948,7 +948,8 @@ const CotizacionVista = () => {
   }, [idCotizacion]);
 
   useEffect(() => {
-    if (normalizarTexto(cotizacion?.estado) === "aprobada") {
+    const estado = normalizarTexto(cotizacion?.estado);
+    if (["aprobada", "aprobada_cliente", "aprobada_final"].includes(estado)) {
       cargarCronogramaCotizacion();
     } else {
       setCronogramaCotizacion(null);
@@ -1184,6 +1185,42 @@ const CotizacionVista = () => {
       });
     } finally {
       setAprobando(false);
+    }
+  };
+
+  const handleAprobarInterivalle = async () => {
+    if (!esAdminSupervisor) {
+      notify("No tienes permisos para aprobar finalmente la cotización", {
+        type: "warning",
+      });
+      return;
+    }
+
+    if (!cronogramaAprobadoInterValle) {
+      notify("Primero debes aprobar el cronograma", { type: "warning" });
+      return;
+    }
+
+    try {
+      setAprobandoInterivalle(true);
+      await httpClient(`${apiUrl}/api/cotizaciones/${idCotizacion}/aprobar-interivalle`, {
+        method: "PUT",
+      });
+      notify("Cotización aprobada finalmente. Se notificó al cliente.", {
+        type: "success",
+      });
+      await cargarCotizacion();
+      await cargarCronogramaCotizacion(false);
+    } catch (error) {
+      console.error("Error aprobando cotización final:", error);
+      notify(
+        error?.body?.message ||
+          error?.message ||
+          "No se pudo aprobar finalmente la cotización",
+        { type: "error" }
+      );
+    } finally {
+      setAprobandoInterivalle(false);
     }
   };
 
@@ -1459,17 +1496,12 @@ const CotizacionVista = () => {
     esAdminSupervisor &&
     cotizacionAprobadaCliente &&
     !cotizacionAprobadaInterivalle;
-  const puedeAprobarCotizacion =
-    puedeGestionarCotizacion && cotizacionAntesAprobar;
   const puedeDevolverARevision =
     esAdminSupervisor && cotizacionAprobadaCliente && !cotizacionAprobadaInterivalle;
   const puedeAdicionarActividades =
     estadoCotizacion !== "rechazada" &&
     !cotizacionAprobada &&
-    (
-      (esAdminSupervisor && cotizacionAntesAprobar) ||
-      (esCliente && estadoCotizacion === "generada")
-    );
+    (esCliente || esAdminSupervisor);
   const puedeVolverEditarCotizacion =
     cotizacionAntesAprobar && (esCliente || esAdminSupervisor);
   const cronogramaDisponible = Boolean(
@@ -1480,6 +1512,18 @@ const CotizacionVista = () => {
   const cronogramaPendienteInterValle =
     cronogramaCotizacion?.estadoCronograma === "PENDIENTE_APROBACION_EMPRESA" ||
     cronogramaCotizacion?.estadoCronograma === "PENDIENTE_APROBACION_INTERIVALLE";
+  const cronogramaAprobadoInterValle =
+    cronogramaCotizacion?.estadoCronograma === "EN_PROCESO" ||
+    cronogramaCotizacion?.estadoCronograma === "FINALIZADO";
+  const puedeAprobarCotizacionInicial =
+    puedeGestionarCotizacion && cotizacionAntesAprobar;
+  const puedeAprobarCotizacionFinal =
+    esAdminSupervisor &&
+    cotizacionAprobadaCliente &&
+    !cotizacionAprobadaInterivalle &&
+    cronogramaAprobadoInterValle;
+  const puedeAprobarCotizacion =
+    puedeAprobarCotizacionInicial || puedeAprobarCotizacionFinal;
 
   const eliminarActividadesSeleccionadas = async () => {
     if (!puedeEliminarActividades || actividadesSeleccionadas.length === 0) {
@@ -1818,10 +1862,14 @@ const CotizacionVista = () => {
             <Button
               variant="contained"
               color="success"
-              onClick={() => setOpenAprobar(true)}
-              disabled={!puedeAprobarCotizacion}
+              onClick={
+                puedeAprobarCotizacionFinal
+                  ? handleAprobarInterivalle
+                  : () => setOpenAprobar(true)
+              }
+              disabled={!puedeAprobarCotizacion || aprobandoInterivalle}
             >
-              APROBAR
+              {aprobandoInterivalle ? "APROBANDO..." : "APROBAR"}
             </Button>
           )}
 

@@ -41,6 +41,35 @@ const defaultSortFieldByResource = {
 
 const esCatalogoV2 = (resource) => resource === "catalogo-v2";
 
+const completarSemanaActividadCatalogo = async (item) => {
+  if (
+    item?.tipoItem !== "ACTIVIDAD" ||
+    item?.semana != null ||
+    !item?.idServicio ||
+    !item?.idItemOrigen
+  ) {
+    return item;
+  }
+
+  try {
+    const { json } = await httpClient(
+      `${apiUrl}/api/pruebas/catalogo-v2/actividades/${item.idServicio}`
+    );
+    const actividades = Array.isArray(json?.actividades) ? json.actividades : [];
+    const actividad = actividades.find(
+      (act) => Number(act.idActividad) === Number(item.idItemOrigen)
+    );
+
+    return {
+      ...item,
+      semana: actividad?.semana ?? item.semana,
+    };
+  } catch (error) {
+    console.warn("No fue posible completar la semana de la actividad:", error);
+    return item;
+  }
+};
+
 const applySortAndPagination = (json, params = {}, resource) => {
   let data = mapIdField(Array.isArray(json) ? json : []);
   const fallbackField = defaultSortFieldByResource[resource] || "id";
@@ -344,9 +373,10 @@ getOne: async (resource, params) => {
 }
   if (esCatalogoV2(resource)) {
     const { json } = await httpClient(`${apiUrl}/api/catalogo-items/${params.id}`);
+    const data = await completarSemanaActividadCatalogo(mapIdField(json));
 
     return {
-      data: mapIdField(json),
+      data,
     };
   }
   const response = await baseDataProvider.getOne(resource, params);

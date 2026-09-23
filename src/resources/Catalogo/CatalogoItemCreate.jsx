@@ -12,6 +12,7 @@ import {
 import RelacionesActividadMaterialV2 from "./RelacionesActividadMaterialV2";
 
 const esActividadAdicional = (tipoItem) => tipoItem === "ACTIVIDAD ADICIONAL";
+const esActividad = (tipoItem) => tipoItem === "ACTIVIDAD";
 
 const CatalogoItemCreate = () => (
   <Create title="Crear item de catalogo V2">
@@ -56,6 +57,20 @@ const CatalogoItemCreate = () => (
         helperText="1 Obra Blanca, 2 Carpinteria, 3 Divisiones en Vidrio, 4 Mesones Marmol."
         validate={required()}
       />
+
+      <FormDataConsumer>
+        {({ formData }) =>
+          esActividad(formData?.tipoItem) ? (
+            <NumberInput
+              source="semana"
+              label="Semana"
+              helperText="Semana sugerida para ubicar esta actividad en la cotizacion y el cronograma."
+              validate={required()}
+              min={1}
+            />
+          ) : null
+        }
+      </FormDataConsumer>
 
       <NumberInput
         source="precioUnitarioVenta"

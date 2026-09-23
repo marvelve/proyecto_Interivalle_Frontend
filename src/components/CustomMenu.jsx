@@ -27,7 +27,7 @@ const navItems = [
     label: "Precios",
     path: "/catalogo-v2",
     icon: <PriceChangeIcon fontSize="small" />,
-    roles: ["1"],
+    roles: ["1", "2"],
   },
   {
     label: "Solicitudes",

@@ -18,10 +18,16 @@ const SeguimientoDetalle = ({ avance, onCerrar }) => {
   if (!avance) return null;
 
   return (
-    <Dialog open={!!avance} onClose={onCerrar} maxWidth="lg" fullWidth>
+    <Dialog
+      open={!!avance}
+      onClose={onCerrar}
+      maxWidth="lg"
+      fullWidth
+      PaperProps={{ sx: { maxHeight: "90vh" } }}
+    >
       <DialogTitle>Detalle del avance semanal</DialogTitle>
 
-      <DialogContent>
+      <DialogContent sx={{ overflowY: "auto" }}>
         <Card sx={{ mb: 3, borderRadius: 3, boxShadow: 3 }}>
           <CardContent>
             <Stack spacing={2}>

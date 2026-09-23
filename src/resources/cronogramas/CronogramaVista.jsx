@@ -207,7 +207,7 @@ const verificarSeguimiento = async (idCronograma) => {
         { method: "PUT" }
       );
 
-      notify("Cronograma aprobado. El seguimiento de obra queda en proceso.", {
+      notify("Cronograma aprobado. Ya puedes aprobar finalmente la cotización.", {
         type: "success",
       });
       await cargarCronograma();

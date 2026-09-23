@@ -11,6 +11,7 @@ import {
 import RelacionesActividadMaterialV2 from "./RelacionesActividadMaterialV2";
 
 const esActividadAdicional = (tipoItem) => tipoItem === "ACTIVIDAD ADICIONAL";
+const esActividad = (tipoItem) => tipoItem === "ACTIVIDAD";
 
 const CatalogoItemEdit = () => (
   <Edit title="Actualizar item V2">
@@ -29,6 +30,21 @@ const CatalogoItemEdit = () => (
       />
 
       <TextInput source="nombreItem" label="Item" validate={required()} fullWidth />
+
+      <FormDataConsumer>
+        {({ formData }) =>
+          esActividad(formData?.tipoItem) ? (
+            <NumberInput
+              source="semana"
+              label="Semana"
+              helperText="Semana sugerida para ubicar esta actividad en la cotizacion y el cronograma."
+              validate={required()}
+              min={1}
+              fullWidth
+            />
+          ) : null
+        }
+      </FormDataConsumer>
 
       <FormDataConsumer>
         {({ formData }) => {

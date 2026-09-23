@@ -26,6 +26,7 @@ import FileDownloadIcon from "@mui/icons-material/FileDownload";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import { Title, useNotify } from "react-admin";
 import { apiUrl, httpClient } from "../app/httpClient";
+import ReporteMaterialesCotizacion from "./ReporteMaterialesCotizacion";
 import {
   centeredPageSx,
   compactTableContainerSx,
@@ -61,6 +62,7 @@ const tabs = [
   "Cronogramas",
   "Avances",
   "Financiero",
+  "Materiales por cotización",
 ];
 
 const normalize = (value) =>
@@ -1149,6 +1151,8 @@ const Reportes = () => {
                     />
                   </Stack>
                 )}
+
+                {tab === 7 && <ReporteMaterialesCotizacion />}
               </Box>
             </Paper>
           </>
